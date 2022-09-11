@@ -1522,6 +1522,8 @@ def edit_menu(click, rows, ready):
     else:
         return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
 
+
+server = app.server
 if __name__ == "__main__":
     while True:
         th = Thread(target=run)
