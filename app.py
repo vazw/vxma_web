@@ -44,32 +44,26 @@ rcs = {"axes.labelcolor":"none",
         "grid.linestyle": ":",
         "axes.titlesize": "xx-large",
         "axes.titleweight": "bold"}
+API_KEY = str(os.environ['API_KEY'])
+API_SECRET = str(os.environ['API_SECRET'])
+LINE_TOKEN=str(os.environ['Line_Notify_Token'])
 
 def get_config():
     global BNBCZ, notify, min_balance, max_margin, API_KEY, LINE_TOKEN, MIN_BALANCE, symbolist
     config = pd.read_sql('SELECT * FROM key',con=con)
     symbolist = pd.read_sql(f'SELECT * FROM Bot',con=con)
     if config.empty:
-        API_KEY = ''
-        API_SECRET = ''
-        LINE_TOKEN = ''
+        # API_KEY = ''
+        # API_SECRET = ''
+        # LINE_TOKEN = ''
         max_margin = '$10'
         MIN_BALANCE = '$50'
     else:
         max_margin = str(config['freeB'][0])
         MIN_BALANCE = str(config['minB'][0])
-        API_KEY = str(config['apikey'][0])
-        API_SECRET = str(config['apisec'][0])
-        LINE_TOKEN = str(config['notify'][0])
-    BNBCZ = {
-        "apiKey": API_KEY,
-        "secret": API_SECRET,
-        'options': {
-        'defaultType': 'future'
-        },
-        'enableRateLimit': True,
-        'adjustForTimeDifference': True
-        }
+        # API_KEY = str(config['apikey'][0])
+        # API_SECRET = str(config['apisec'][0])
+        # LINE_TOKEN = str(config['notify'][0])
     notify = LineNotify(LINE_TOKEN)
     if MIN_BALANCE[0]=='$':
         min_balance=float(MIN_BALANCE[1:len(MIN_BALANCE)])
@@ -79,7 +73,12 @@ def get_config():
     else: max_margin = float(max_margin)
     return  
 get_config()
-
+BNBCZ = {
+    "apiKey": API_KEY,
+    "secret": API_SECRET,
+    'options': {'defaultType': 'future'},
+    'enableRateLimit': True,
+    'adjustForTimeDifference': True}
 #Bot setting
 insession = dict(name=False,day=False,hour=False)
 #STAT setting
@@ -982,9 +981,9 @@ Margin_input = html.Div([html.P('MaxMargin/trade'),dbc.Input(id='maxmargin-input
 Apply_input = html.Div([dbc.Button('Apply to Chart',id='Apply-strategy',title = 'Apply_Strategy', name='refresh', color='warning', n_clicks=0)])
 Runbot_input = html.Div([dcc.ConfirmDialogProvider([dbc.Button('Start Bot',title = 'Start_Bot', name='RunBot', size="lg", color='danger' , n_clicks=0)],message='ชัวร์แล้วนาาา?',submit_n_clicks=0, id='run-input')])
 Leverage_input = html.Div([html.P('Leverage'),dbc.Input(id='leverage-input', type='number', value='20', min='1', max='125')])
-API_KEY_input = html.Div([html.P('API KEY'),dbc.Input(id='api-key-input', type='text', value=f'Binance API Key {API_KEY[:-50]}**************************************************')])
-API_SECRET_input = html.Div([html.P('API SECRET'),dbc.Input(id='api-secret-input', type='password', value='Binance API Secret Key')])
-NOTIFY_input = html.Div([html.P('LINE : Notify'),dbc.Input(id='api-notify-input', type='text', value=f'Line Notify key {LINE_TOKEN[:-35]}**************************************************')])
+API_KEY_input = html.Div([html.P('API KEY'),dbc.Input(disabled=True, id='api-key-input', type='text', value='Binance API Key')])
+API_SECRET_input = html.Div([html.P('API SECRET'),dbc.Input(disabled=True, id='api-secret-input', type='password', value='Binance API Secret Key')])
+NOTIFY_input = html.Div([html.P('LINE : Notify'),dbc.Input(disabled=True, id='api-notify-input', type='text', value='Line Notify key')])
 Sumkey_input = html.Div([dbc.Button('Apply',id='set-api-key',title = 'Setting', name='refresh', size="lg", color='warning', n_clicks=0)])
 Freebalance_input = html.Div([html.P('Free Balance $'),dbc.Input(id='freebalance-input', type='text', value=f'Free Balance : วงเงินสำหรับบอท {max_margin}')])
 minBalance_input = html.Div([html.P('Min Balance $'),dbc.Input(id='minBalance-input', type='text', value=f'Min Balance : ถ้าเงินเหลือต่ำกว่านี้บอทจะหยุดเข้า Position {min_balance}')])
@@ -1043,7 +1042,8 @@ summary_page = html.Div([
                     html.P('87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm')
                 ]),
                 dbc.Row([
-                    html.H4('โปรดใช้งานบอทอย่างระมัดระวัง : Use as your own RISK', style={'color': 'red'})
+                    html.H4('โปรดใช้งานบอทอย่างระมัดระวัง : Use as your own RISK', style={'color': 'red'}),
+                    html.H5('Next version Portfolio Tracker!', style={'color': 'white'})
                 ])
                 
             ])
