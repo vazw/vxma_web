@@ -1,5 +1,6 @@
 numpy
 pandas
+pyproject.toml-based
 ta-lib
 ccxt
 line_notify
@@ -11,4 +12,3 @@ plotly
 dash_bootstrap_components
 bcrypt
 gunicorn
-pyproject-toml
