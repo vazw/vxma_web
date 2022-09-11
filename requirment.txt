@@ -1,0 +1,16 @@
+numpy
+pandas
+ta-lib
+ccxt
+line_notify
+tabulate
+mplfinance
+backtesting
+dash
+plotly
+dash_bootstrap_components
+bcrypt
+gunicorn
+celery
+diskcache
+"dash[diskcache]"
