@@ -6,7 +6,7 @@ User = 'vxma'
 password = 'vxmaBot'
 
 ### How to deploy to HEROKU?
-add 'heroku/python' and 'https://github.com/numrut/heroku-buildpack-python-talib.git' to HEROKU Buildpacks in the Setting tab.
+add 'heroku/python' and 'numrut/ta-lib' or 'https://github.com/numrut/heroku-buildpack-python-talib.git' to HEROKU Buildpacks in the Setting tab.
 ![image](https://user-images.githubusercontent.com/8637706/189532271-5bdf60f7-801f-4711-8468-716e5b3de7af.png)
 fork this repo to your's then deploy on HEROKU.
 when finished set 'Config Vars' for Binance 'API_KEY', 'API_SECRET', and 'Line_Notify_Token'
@@ -14,7 +14,7 @@ when finished set 'Config Vars' for Binance 'API_KEY', 'API_SECRET', and 'Line_N
 
 
 ### วิธีการ Deploy บน HEROKU.
-เพิ่ม 'heroku/python' และ 'https://github.com/numrut/heroku-buildpack-python-talib.git' ไปยัง HEROKU Buildpacks ในแทบ Setting.
+เพิ่ม 'heroku/python' และ 'numrut/ta-lib' หรือ 'https://github.com/numrut/heroku-buildpack-python-talib.git' ไปยัง HEROKU Buildpacks ในแทบ Setting.
 กด fork repo นี้ แล้วไปกด deploy ที่ HEROKU. ได้เลย
 หลังจากนั้น ไปกด 'Config Vars' เพื่อเพิ่ม Binance 'API_KEY', 'API_SECRET', และ 'Line_Notify_Token'
 ### รหัสผ่าน หลัง Log-in แล้วให้เปลี่ยนรหัสทันที! 
