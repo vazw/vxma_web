@@ -1,7 +1,7 @@
 numpy
 pandas
 pyproject.toml
-ta-lib
+#ta-lib
 ccxt
 line_notify
 tabulate
