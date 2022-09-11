@@ -11,3 +11,4 @@ plotly
 dash_bootstrap_components
 bcrypt
 gunicorn
+pyproject-toml
