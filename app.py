@@ -1526,5 +1526,5 @@ if __name__ == "__main__":
     while True:
         th = Thread(target=run)
         th.start()
-        app.run(debug=True,port=9999)
+        app.run(debug=False,port=80)
         th.join()
