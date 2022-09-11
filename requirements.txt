@@ -1,6 +1,6 @@
 numpy
 pandas
-pyproject.toml-based
+pyproject.toml
 ta-lib
 ccxt
 line_notify
