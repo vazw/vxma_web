@@ -11,6 +11,3 @@ plotly
 dash_bootstrap_components
 bcrypt
 gunicorn
-celery
-diskcache
-"dash[diskcache]"
