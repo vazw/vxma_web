@@ -1438,7 +1438,7 @@ def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, s
     State('repasswd2-input', 'value'),
     State('readyAPI-input', 'value'),
     suppress_callback_exceptions=True)
-def setting(click, freeB, minB, api_key, apiZ, notify, pwd, ready):
+def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
     if click is not None:
         data = pd.DataFrame(columns=['freeB','minB','apikey','apisec','notify'])
         ok = True if 'pass' in ready else False
@@ -1447,7 +1447,7 @@ def setting(click, freeB, minB, api_key, apiZ, notify, pwd, ready):
         valit = True if perf(id, pwd) else False
         if ok and valit:
             try:
-                compo = [freeB, minB, api_key, apiZ, notify]
+                compo = [freeB, minB, api_key, apiZ, notifykey]
                 data.loc[1] = compo
                 data = data.set_index('apikey')
                 data.to_sql('key', con=con, if_exists='replace', index=True, index_label='apikey')
