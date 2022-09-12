@@ -835,7 +835,7 @@ async def main():
     if str(local_time[14:-9]) == '1':
         insession['day'] = False
         insession['hour'] = False
-    if str(local_time[12:-9]) == '8:0' and not insession['day']:
+    if str(local_time[12:-9]) == '0:0' and not insession['day']:
         insession['day'] = True
         insession['hour'] = True   
         await asyncio.gather(dailyreport())     
@@ -1525,11 +1525,11 @@ def edit_menu(click, rows, ready):
 def buildapp(app):
     th = Thread(target=run)
     th.start()
-    app.run_server(host='0.0.0.0',port=80)
     th.join()
     app = app.server
     return app
 
 server = buildapp(app)
 if __name__ == "__main__":
+    app.run_server()
     buildapp(app)
