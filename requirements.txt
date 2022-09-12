@@ -1,13 +1,13 @@
 numpy
 pandas
-pyproject.toml
-#ta-lib
+ta-lib
 ccxt
 line_notify
 tabulate
 mplfinance
 backtesting
 dash
+dash[celery]
 plotly
 dash_bootstrap_components
 bcrypt
