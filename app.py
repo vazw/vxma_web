@@ -14,13 +14,18 @@ from tabulate import tabulate
 import logging
 import util as indi
 import mplfinance as mplf
-from dash import Dash, html, dcc, dash_table, register_page
+from dash import Dash, html, dcc, dash_table, register_page, CeleryManager
 import dash_bootstrap_components as dbc
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from threading import Thread
 import os
+from celery import Celery
+from uuid import uuid4
+launch_uid = uuid4()
+celery_app = Celery(__name__, broker=os.getenv('REDIS_URL', 'redis://localhost:6379'), backend=os.getenv('REDIS_URL', 'redis://localhost:6379'))
+background_callback_manager = CeleryManager(celery_app, cache_by=[lambda: launch_uid], expire=100)
 
 def clearconsol():
     try:
@@ -74,11 +79,11 @@ def get_config():
     return  
 get_config()
 BNBCZ = {
-    "apiKey": API_KEY,
-    "secret": API_SECRET,
-    'options': {'defaultType': 'future'},
-    'enableRateLimit': True,
-    'adjustForTimeDifference': True}
+"apiKey": API_KEY,
+"secret": API_SECRET,
+'options': {'defaultType': 'future'},
+'enableRateLimit': True,
+'adjustForTimeDifference': True}
 #Bot setting
 insession = dict(name=False,day=False,hour=False)
 #STAT setting
@@ -839,10 +844,6 @@ async def main():
         insession['day'] = True
         insession['hour'] = True   
         await asyncio.gather(dailyreport())     
-    if str(local_time[14:-9]) == '0' and not insession['hour']:
-        total = round(float(balance['total']['USDT']),2)
-        notify.send(f'Total Balance : {total} USDT',sticker_id=10863, package_id=789)
-        insession['hour'] = True
     if len(symbolist.index) > 0:
         try:
             exchange = await connect()
@@ -877,6 +878,10 @@ async def main():
                 print(str(e)[0:200])
                 logging.info(e)
                 balance = await exchange.fetch_balance()
+            if str(local_time[14:-9]) == '0' and not insession['hour']:
+                total = round(float(balance['total']['USDT']),2)
+                notify.send(f'Total Balance : {total} USDT',sticker_id=10863, package_id=789)
+                insession['hour'] = True
             exchange.precisionMode = accxt.DECIMAL_PLACES
             free = float(balance['free']['USDT'])
             await disconnect(exchange)
@@ -1215,7 +1220,7 @@ ema_index = html.Div([refresher_i,
                 
             ])
 # creates the Dash App
-app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG],suppress_callback_exceptions=True, title='VXMA Bot', update_title=None)
+app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG],suppress_callback_exceptions=True, title='VXMA Bot', update_title=None, background_callback_manager=background_callback_manager)
 register_page("VXMA", path='/index', layout=main_page)
 app.layout = html.Div([dcc.Location(id='url', refresh=True),html.Div(id='page-content-login')])
 #logout button
@@ -1296,7 +1301,8 @@ def pathname_page(pathname):
     State('RSI-input', 'value'),
     State('Andean-Oscillator-input', 'value'),
     State('Pivot-lookback-input', 'value'),
-    suppress_callback_exceptions=True)
+    background=True,
+    prevent_initial_call=True)
 def update_VXMA_chart(interval, click, symbol, timeframe, zoom, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, pivot):
     timeframe = TIMEFRAMES_DICT[timeframe]
     num_bars = ZOOM_DICT[zoom]
@@ -1343,7 +1349,8 @@ def update_VXMA_chart(interval, click, symbol, timeframe, zoom, atr_input, atrM_
     State('num-bar-input', 'value'),
     State('emafast-input', 'value'),
     State('emaslow-input', 'value'),
-    suppress_callback_exceptions=True)
+    prevent_initial_call=True,
+    background=True)
 def update_EMA_chart(interval, click, symbol, timeframe, zoom, emafast, emaslow):
     timeframe = TIMEFRAMES_DICT[timeframe]
     num_bars = ZOOM_DICT[zoom]
@@ -1400,7 +1407,9 @@ def update_EMA_chart(interval, click, symbol, timeframe, zoom, emafast, emaslow)
     State('per-TP2-input', 'value'),
     State('Risk-input', 'value'),
     State('maxmargin-input', 'value'),
-    State('ready-input', 'value'))
+    State('ready-input', 'value'),
+    background=True,
+    prevent_initial_call=True)
 def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, switches, leverage, Pivot, RR1, RR2, TP1, TP2, Risk,maxMargin, ready):
     if click is not None:
         data = pd.DataFrame(columns=BOTCOL)
@@ -1437,7 +1446,8 @@ def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, s
     State('api-notify-input', 'value'),
     State('repasswd2-input', 'value'),
     State('readyAPI-input', 'value'),
-    suppress_callback_exceptions=True)
+    background=True,
+    prevent_initial_call=True)
 def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
     if click is not None:
         data = pd.DataFrame(columns=['freeB','minB','apikey','apisec','notify'])
@@ -1467,7 +1477,8 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
     State('passwd-input', 'value'),
     State('repasswd2-input', 'value'),
     State('newUsername-input', 'value'),
-    suppress_callback_exceptions=True)
+    background=True,
+    prevent_initial_call=True)
 def resetpwd(click, pwd1, pwd2, id):
     if click is not None:
         data = pd.DataFrame(columns=['id','pass'])
@@ -1491,7 +1502,9 @@ def resetpwd(click, pwd1, pwd2, id):
 #read data running bot
 @app.callback(
 Output('datatable', 'children'),
-Input('update-table', 'n_clicks'),)
+Input('update-table', 'n_clicks'),
+background=True,
+prevent_initial_call=True)
 def runningBot(click):
     if click is not None:
         get_config()
@@ -1503,7 +1516,9 @@ def runningBot(click):
 Output('alert-ta', 'children'),
 Input('edit-table', 'submit_n_clicks'),
 State('datatable', 'data'),
-State('edit-input', 'value'))
+State('edit-input', 'value'),
+background=True,
+prevent_initial_call=True)
 def edit_menu(click, rows, ready):
     if click is not None and ready is not None:
         ok = True if 'pass' in ready else False
@@ -1522,6 +1537,7 @@ def edit_menu(click, rows, ready):
     else:
         return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
 
+
 def buildapp(app):
     th = Thread(target=run)
     th.start()
@@ -1532,3 +1548,4 @@ def buildapp(app):
 server = buildapp(app)
 if __name__ == "__main__":
     app.run_server()
+        
