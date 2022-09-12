@@ -825,6 +825,8 @@ async def main():
     symbolist = pd.read_sql(f'SELECT * FROM Bot',con=con)
     get_config()
     t2 = time.time()
+    seconds = time.time()
+    local_time = time.ctime(seconds)
     if insession['name'] and t1 == 0:
         t1 = time.time()
     if float(t2-t1) > 900 :
@@ -877,8 +879,6 @@ async def main():
                 balance = await exchange.fetch_balance()
             exchange.precisionMode = accxt.DECIMAL_PLACES
             free = float(balance['free']['USDT'])
-            seconds = time.time()
-            local_time = time.ctime(seconds)
             await disconnect(exchange)
             for i in range(len(symbolist.index)):
                 try:
