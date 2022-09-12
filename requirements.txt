@@ -1,6 +1,5 @@
 numpy
 pandas
-ta-lib
 ccxt
 line_notify
 tabulate
