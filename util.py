@@ -227,10 +227,10 @@ def ema(df, emafast, emaslow):
     df['sellPrice'] = [np.nan] * m
     try:
         for i in (x for x in range(2,m)):
-            if df['emafast'][i] > df['emaslow'][i] and df['emafast'][i-1] < df['emaslow'][i-1]:
+            if df['emafast'][i-1] > df['emaslow'][i-1] and df['emafast'][i-2] < df['emaslow'][i-2]:
                 df['buy'][i] = True
                 df['buyPrice'][i] = df['Close'][i]
-            if df['emafast'][i] < df['emaslow'][i] and df['emafast'][i-1] > df['emaslow'][i-1]:
+            if df['emafast'][i-1] < df['emaslow'][i-1] and df['emafast'][i-2] > df['emaslow'][i-2]:
                 df['sell'][i] = True
                 df['sellPrice'][i] = df['Close'][i]
         return df
