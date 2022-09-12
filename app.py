@@ -1532,4 +1532,3 @@ def buildapp(app):
 server = buildapp(app)
 if __name__ == "__main__":
     app.run_server()
-    buildapp(app)
