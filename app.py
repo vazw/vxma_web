@@ -1522,11 +1522,14 @@ def edit_menu(click, rows, ready):
     else:
         return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
 
+def buildapp(app):
+    th = Thread(target=run)
+    th.start()
+    app.run_server(host='0.0.0.0',port=80)
+    th.join()
+    app = app.server
+    return app
 
-server = app.server
+
 if __name__ == "__main__":
-    while True:
-        th = Thread(target=run)
-        th.start()
-        app.run_server(host='0.0.0.0',port=80)
-        th.join()
+    server = buildapp(app)
