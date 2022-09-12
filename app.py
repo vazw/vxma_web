@@ -1530,6 +1530,6 @@ def buildapp(app):
     app = app.server
     return app
 
-
+server = buildapp(app)
 if __name__ == "__main__":
-    server = buildapp(app)
+    buildapp(app)
