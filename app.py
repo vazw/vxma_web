@@ -14,18 +14,32 @@ from tabulate import tabulate
 import logging
 import util as indi
 import mplfinance as mplf
-from dash import Dash, html, dcc, dash_table, register_page, CeleryManager
+from dash import Dash, html, dcc, dash_table, register_page, CeleryManager, DiskcacheManager
 import dash_bootstrap_components as dbc
-from dash.dependencies import Input, Output, State
+import dash_mantine_components as dmc
+from dash.dependencies import Input, Output, State, ClientsideFunction
 from dash.exceptions import PreventUpdate
 import plotly.graph_objects as go
 from threading import Thread
 import os
-from celery import Celery
 from uuid import uuid4
 launch_uid = uuid4()
-celery_app = Celery(__name__, broker=os.getenv('REDIS_URL', 'redis://localhost:6379'), backend=os.getenv('REDIS_URL', 'redis://localhost:6379'))
-background_callback_manager = CeleryManager(celery_app, cache_by=[lambda: launch_uid], expire=100)
+
+if 'REDIS_URL' in os.environ:
+    # Use Redis & Celery if REDIS_URL set as an env variable
+    from celery import Celery
+    celery_app = Celery(__name__, broker=os.environ['REDIS_URL'], backend=os.environ['REDIS_URL'])
+    background_callback_manager = CeleryManager(
+        celery_app, cache_by=[lambda: launch_uid], expire=60
+    )
+
+else:
+    # Diskcache for non-production apps when developing locally
+    import diskcache
+    cache = diskcache.Cache("./cache")
+    background_callback_manager = DiskcacheManager(
+        cache, cache_by=[lambda: launch_uid], expire=60
+    )
 
 def clearconsol():
     try:
@@ -49,26 +63,26 @@ rcs = {"axes.labelcolor":"none",
         "grid.linestyle": ":",
         "axes.titlesize": "xx-large",
         "axes.titleweight": "bold"}
-API_KEY = str(os.environ['API_KEY'])
-API_SECRET = str(os.environ['API_SECRET'])
-LINE_TOKEN=str(os.environ['Line_Notify_Token'])
+# API_KEY = str(os.environ['API_KEY'])
+# API_SECRET = str(os.environ['API_SECRET'])
+# LINE_TOKEN=str(os.environ['Line_Notify_Token'])
 
 def get_config():
     global BNBCZ, notify, min_balance, max_margin, API_KEY, LINE_TOKEN, MIN_BALANCE, symbolist
     config = pd.read_sql('SELECT * FROM key',con=con)
     symbolist = pd.read_sql(f'SELECT * FROM Bot',con=con)
     if config.empty:
-        # API_KEY = ''
-        # API_SECRET = ''
-        # LINE_TOKEN = ''
+        API_KEY = ''
+        API_SECRET = ''
+        LINE_TOKEN = ''
         max_margin = '$10'
         MIN_BALANCE = '$50'
     else:
         max_margin = str(config['freeB'][0])
         MIN_BALANCE = str(config['minB'][0])
-        # API_KEY = str(config['apikey'][0])
-        # API_SECRET = str(config['apisec'][0])
-        # LINE_TOKEN = str(config['notify'][0])
+        API_KEY = str(config['apikey'][0])
+        API_SECRET = str(config['apisec'][0])
+        LINE_TOKEN = str(config['notify'][0])
     notify = LineNotify(LINE_TOKEN)
     if MIN_BALANCE[0]=='$':
         min_balance=float(MIN_BALANCE[1:len(MIN_BALANCE)])
@@ -76,14 +90,14 @@ def get_config():
     if max_margin[0]=='$' :
         max_margin = float(max_margin[1:len(max_margin)])
     else: max_margin = float(max_margin)
+    BNBCZ = {
+    "apiKey": API_KEY,
+    "secret": API_SECRET,
+    'options': {'defaultType': 'future'},
+    'enableRateLimit': True,
+    'adjustForTimeDifference': True}
     return  
 get_config()
-BNBCZ = {
-"apiKey": API_KEY,
-"secret": API_SECRET,
-'options': {'defaultType': 'future'},
-'enableRateLimit': True,
-'adjustForTimeDifference': True}
 #Bot setting
 insession = dict(name=False,day=False,hour=False)
 #STAT setting
@@ -701,7 +715,7 @@ async def feed(df,symbol, tf, RISK, Max_Size, TPPer, TPPer2, USETP, USESL, Taili
             is_in_Short = False
             is_in_Long = False 
         last = len(df.index)-1
-        if df['BUY'][last] :
+        if df['BUY'][last] == 1:
             print("changed to Bullish, buy")
             if is_in_Short :
                 print('closeshort')
@@ -712,7 +726,7 @@ async def feed(df,symbol, tf, RISK, Max_Size, TPPer, TPPer2, USETP, USESL, Taili
                 is_in_Long = True
             else:
                 print("already in position, nothing to do")
-        if df['SELL'][last]:
+        if df['SELL'][last]  == 1:
             print("changed to Bearish, Sell")
             if is_in_Long :
                 print('closelong')
@@ -827,6 +841,7 @@ async def dailyreport():
 t1 = 0
 async def main():
     global symbolist, botStatus, insession, t1, t2
+    await asyncio.sleep(60)
     symbolist = pd.read_sql(f'SELECT * FROM Bot',con=con)
     get_config()
     t2 = time.time()
@@ -946,6 +961,7 @@ def run():
 nomEX = ccxt.binance()
 symbols = pd.DataFrame()
 syms = []
+
 try:
     market = nomEX.fetchTickers(params={'type':'future'})
 except:
@@ -965,279 +981,558 @@ newsym = []
 for symbol in symbols.index:
     newsym.append(symbol)
 
+
+option_input = dmc.Group(
+    direction="column",
+    children=[
+        dmc.Checkbox(label="Long", size="xs", checked=True,id="Long-input"),
+        dmc.Checkbox(label="Short", size="xs", checked=True,id="Short-input"),
+        dmc.Checkbox(label="TP1", size="xs", checked=True,id="TP1-input"),
+        dmc.Checkbox(label="TP2", size="xs", checked=True,id="TP2-input"),
+        dmc.Checkbox(label="Stop-Loss", size="xs", checked=True,id="Stop-input"),
+        dmc.Checkbox(label="Tailing-Stop", size="xs", checked=True,id="Tailing-input"),
+    ],
+)
 #HTML COMPONENT 
-symbol_dropdown = html.Div([html.P('Symbol:'),dcc.Dropdown(id='symbol-dropdown',options=[{'label': symbol, 'value': symbol} for symbol in newsym],value='BTC/USDT')])
-timeframe_dropdown = html.Div([html.P('Timeframe:'),dcc.Dropdown(id='timeframe-dropdown',options=[{'label': timeframe, 'value': timeframe} for timeframe in TIMEFRAMES],value='1d')])
-num_bars_input = html.Div([html.P('Zoom'),dcc.Dropdown(id='num-bar-input', value='X4', options=['X1','X2','X3','X4','X5'])])
-atr_input = html.Div([html.P('ATR Period'),dbc.Input(id='atr-input', type='number', value='12', min='1', max='100')])
-atrm_input = html.Div([html.P('ATR Mutiply'),dbc.Input(id='atrm-input', type='number', value='1.6', min='0.1', max='100', step='0.1')])
-EMA_input = html.Div([html.P('EMA'),dbc.Input(id='EMA-input', type='number', value='30', min='1', max='500')])
-SUBHAG_input = html.Div([html.P('SUBHAG'),dbc.Input(id='SUBHAG-input', type='number', value='30', min='1', max='500')])
-SMOOTH_input = html.Div([html.P('SMOOTH'),dbc.Input(id='SMOOTH-input', type='number', value='30', min='1', max='500')])
-RSI_input = html.Div([html.P('RSI'),dbc.Input(id='RSI-input', type='number', value='14', min='1', max='100')])
-AOL_input = html.Div([html.P('Andean Oscillator'),dbc.Input(id='Andean-Oscillator-input', type='number', value='30', min='1', max='500')])
-Pivot_input = html.Div([html.P('Pivot lookback'),dbc.Input(id='Pivot-lookback-input', type='number', value='60', min='1', max='500')])
-RRTP1_input = html.Div([html.P('Risk:Reward TP1'),dbc.Input(id='RR-TP1-input', type='number', value='3', min='1', max='100', step='0.1')])
-RRTP2_input = html.Div([html.P('Risk:Reward TP2'),dbc.Input(id='RR-TP2-input', type='number', value='4.5', min='1', max='100', step='0.1')])
-perTP1_input = html.Div([html.P('Percent TP1'),dbc.Input(id='per-TP1-input', type='number', value='50', min='0', max='100')])
-perTP2_input = html.Div([html.P('Percent TP2'),dbc.Input(id='per-TP2-input', type='number', value='50', min='0', max='100')])
-RISK_input = html.Div([html.P('RISK ($,%)lost/trade'),dbc.Input(id='Risk-input', type='text', value='$3')])
-Margin_input = html.Div([html.P('MaxMargin/trade'),dbc.Input(id='maxmargin-input', type='text', value='%5')])
-Apply_input = html.Div([dbc.Button('Apply to Chart',id='Apply-strategy',title = 'Apply_Strategy', name='refresh', color='warning', n_clicks=0)])
-Runbot_input = html.Div([dcc.ConfirmDialogProvider([dbc.Button('Start Bot',title = 'Start_Bot', name='RunBot', size="lg", color='danger' , n_clicks=0)],message='ชัวร์แล้วนาาา?',submit_n_clicks=0, id='run-input')])
-Leverage_input = html.Div([html.P('Leverage'),dbc.Input(id='leverage-input', type='number', value='20', min='1', max='125')])
-API_KEY_input = html.Div([html.P('API KEY'),dbc.Input(disabled=True, id='api-key-input', type='text', value='Binance API Key')])
-API_SECRET_input = html.Div([html.P('API SECRET'),dbc.Input(disabled=True, id='api-secret-input', type='password', value='Binance API Secret Key')])
-NOTIFY_input = html.Div([html.P('LINE : Notify'),dbc.Input(disabled=True, id='api-notify-input', type='text', value='Line Notify key')])
-Sumkey_input = html.Div([dbc.Button('Apply',id='set-api-key',title = 'Setting', name='refresh', size="lg", color='warning', n_clicks=0)])
-Freebalance_input = html.Div([html.P('Free Balance $'),dbc.Input(id='freebalance-input', type='text', value=f'Free Balance : วงเงินสำหรับบอท {max_margin}')])
-minBalance_input = html.Div([html.P('Min Balance $'),dbc.Input(id='minBalance-input', type='text', value=f'Min Balance : ถ้าเงินเหลือต่ำกว่านี้บอทจะหยุดเข้า Position {min_balance}')])
-passwd_input = html.Div([html.P('Reset password'),dbc.Input(id='passwd-input', type='password', value='reset password')])
-passwd2_input = html.Div([html.P('Confirm password'),dbc.Input(id='repasswd2-input', type='password', value='Confirm password')])
-newUsername = html.Div([html.P('New Username'),dbc.Input(id='newUsername-input', type='text', value='Change new Username')])
-EMAFAST_input = html.Div([html.P('EMA Fast'),dbc.Input(id='emafast-input', type='number', value='12', min='1', max='500')])
-EMASLOW_input = html.Div([html.P('EMA Slow'),dbc.Input(id='emaslow-input', type='number', value='26', min='1', max='500')])
-resetpass_input = html.Div([dbc.Button('Reset Password',id='resetpass-input', color='danger', name='RunBot', size="lg", n_clicks=0)])
-logoutBut = html.Div([dbc.Button('Log Out',id='logoutBut', color='danger', size="lg", n_clicks=0)])
-edit_table = html.Div([dcc.ConfirmDialogProvider([dbc.Button('Edit', color='warning', size="lg", n_clicks=0)],id='edit-table',message='ชัวร์แล้วนาาา?',submit_n_clicks=0)])
-refresh_table = html.Div([dbc.Button('Refresh',id='update-table', color='info', size="lg", n_clicks=0)])
+symbol_dropdown = dmc.Select(
+    data=[{'label': symbol, 'value': symbol} for symbol in newsym],
+    label='Symbol/Pair',
+    id='symbol-dropdown',
+    searchable=True,
+    value="BTC/USDT",
+    clearable=False,
+    style={"width": 120},
+)
+timeframe_dropdown = dmc.Select(
+    data=[{'label': timeframe, 'value': timeframe} for timeframe in TIMEFRAMES],
+    label='Timeframe',
+    id='timeframe-dropdown',
+    searchable=True,
+    value="6h",
+    clearable=False,
+    style={"width": 75},
+)
+num_bars_input = dmc.Select(
+    data=['X1','X2','X3','X4','X5'],
+    label='Zoom',
+    id='num-bar-input',
+    searchable=True,
+    value="X4",
+    clearable=False,
+    style={"width": 75},
+)
 
-option_input = html.Div([dcc.Checklist(
-   options=[
-       {'label': 'Long Position', 'value': 'ul'},
-       {'label': 'Short Position', 'value': 'us'},
-       {'label': 'Take-Profit', 'value': 'tp'},
-       {'label': 'Stop-Loss', 'value': 'sl'},
-       {'label': 'Tailing-Stop ', 'value': 'tsl'},],value=['ul','us','tp','sl','tsl'],id="switches-input")])
-tabs_styles = {'height': '40px'}
-tab_style = {
-    'borderBottom': '1px solid #d6d6d6',
-    'padding': '6px',
-    'backgroundColor': 'black',
-    'color': 'white'}
-tab_selected_style = {
-    'borderTop': '1px solid #d6d6d6',
-    'borderBottom': '1px solid #d6d6d6',
-    'backgroundColor': 'Gray',
-    'color': 'white',
-    'fontWeight': 'bold',
-    'padding': '6px'}
-ready_input = html.Div([dcc.Checklist(options=[{'label': 'ฉันเข้าใจในความเสี่ยง และยอมรับความเจ็บปวดหลังพ่ายแพ้', 'value': 'pass'},],value=[],id="ready-input")])
-edit_input = html.Div([dcc.Checklist(options=[{'label': 'ฉันได้ตรวจทานการตั้งค่าใหม่เรียบร้อยแล้ว', 'value': 'pass'},],value=[],id="edit-input")])
-readyAPI_input = html.Div([dcc.Checklist(options=[{'label': 'ฉันได้ตรวจทานความถูกต้องเรียบร้อยแล้ว และยอมรับว่า Vaz จะไม่รับผิดชอบเงินของคุณ', 'value': 'pass'},],value=[],id="readyAPI-input")],style={'align':'center'})
-session = dcc.Interval(id='session', interval=900000)
-refresher_i = dcc.Interval(id='update', interval=9999)
-index_page = html.Div([
-    html.Div(dcc.Input(id="user", type="text", placeholder="Enter Username",className="inputbox1",style={'margin-left':'35%','width':'450px','height':'45px','padding':'10px','margin-top':'60px','font-size':'16px','border-width':'3px','border-color':'#a0a3a2'}),),
-    html.Div(dcc.Input(id="passw", type="password", placeholder="Enter Password",className="inputbox2",style={'margin-left':'35%','width':'450px','height':'45px','padding':'10px','margin-top':'10px','font-size':'16px','border-width':'3px','border-color':'#a0a3a2',}),),
-    html.Div([dcc.Link([dbc.Button('Log in',id='verify', color='danger', name='RunBot', size="lg", n_clicks=0, style={'margin-left':'35%','width':'450px','height':'45px','padding':'10px','margin-top':'10px','font-size':'16px','border-width':'3px','border-color':'#a0a3a2',})],href='/index',refresh=True)]),html.Div(id='output1')])
-main_page = html.Div([session,
-    dcc.Tabs(id='tabs-one', value='tab-4', children=[
-        dcc.Tab(label='Summary', value='tab-4', style=tab_style, selected_style=tab_selected_style),
-        dcc.Tab(label='VXMA bot', value='tab-1', style=tab_style, selected_style=tab_selected_style),
-        dcc.Tab(label='EMA bot', value='tab-5', style=tab_style, selected_style=tab_selected_style),
-        dcc.Tab(label='Running Bot', value='tab-2', style=tab_style, selected_style=tab_selected_style),
-        dcc.Tab(label='Setting', value='tab-3', style=tab_style, selected_style=tab_selected_style),
-    ], style=tabs_styles),html.Div(id='tabs-content-1')],style={'margin-left': '1%','margin-right':'1%'})
+atr_input = dmc.NumberInput(
+    label="ATR Period",
+    id='atr-input',
+    value=12,
+    min=1,
+    step=1,
+    style={"width": 75},
+)
+atrm_input = dmc.NumberInput(
+    label="ATR.M",
+    id='atrm-input',
+    precision=1,
+    value=1.6,
+    min=0.1,
+    step=0.1,
+    style={"width": 75},
+)
+EMA_input = dmc.NumberInput(
+    label="EMA",
+    id='EMA-input',
+    value=30,
+    min=1,
+    step=1,
+    style={"width": 75},
+)
+SUBHAG_input = dmc.NumberInput(
+    label="SUBHAG",
+    id='SUBHAG-input',
+    value=30,
+    min=1,
+    step=1,
+    style={"width": 75},
+)
+SMOOTH_input = dmc.NumberInput(
+    label="SMOOTH",
+    id='SMOOTH-input',
+    value=30,
+    min=1,
+    step=1,
+    style={"width": 75},
+)
+RSI_input = dmc.NumberInput(
+    label="RSI",
+    id='RSI-input',
+    value=25,
+    min=1,
+    step=1,
+    style={"width": 75},
+)
+AOL_input = dmc.NumberInput(
+    label="Oscillator",
+    id='Andean-Oscillator-input',
+    value=30,
+    min=1,
+    max=500,
+    step=1,
+    style={"width": 75},
+)
+Pivot_input = dmc.NumberInput(
+    label="Pivot",
+    id='Pivot-lookback-input',
+    value=60,
+    min=1,
+    max=500,
+    step=1,
+    style={"width": 75},
+)
+RRTP1_input = dmc.NumberInput(
+    label="R:R TP1",
+    id='RR-TP1-input',
+    precision=1,
+    value=3,
+    min=1,
+    step=0.1,
+    style={"width": 75},
+)
+RRTP2_input = dmc.NumberInput(
+    label="R:R TP2",
+    id='RR-TP2-input',
+    precision=1,
+    value=4.5,
+    min=1,
+    step=0.1,
+    style={"width": 75},
+)
+perTP1_input = dmc.NumberInput(
+    label="% TP1",
+    id='per-TP1-input',
+    value=50,
+    min=1,
+    max=100,
+    step=1,
+    style={"width": 75},
+)
+perTP2_input = dmc.NumberInput(
+    label="% TP2",
+    id='per-TP2-input',
+    value=50,
+    min=0,
+    max=100,
+    step=1,
+    style={"width": 75},
+)
+RISK_input = dmc.TextInput(label="RISK($,%)", style={"width": 75},id='Risk-input', value='$3', type='text')
+Margin_input = dmc.TextInput(label="MaxMargin", style={"width": 75},id='maxmargin-input', value='%5', type='text')
 
-summary_page = html.Div([
-                dbc.Row([
-                    html.H3('ยินดีต้อนรับเข้าสู่บอท VXMA x Binance API'),
-                    html.H5('Donate : XMR'),
-                    html.P('87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm')
-                ]),
-                dbc.Row([
-                    html.H4('โปรดใช้งานบอทอย่างระมัดระวัง : Use as your own RISK', style={'color': 'red'}),
-                    html.H5('Next version Portfolio Tracker!', style={'color': 'white'})
-                ])
-                
-            ])
+Apply_input = dmc.Button("Apply Setting", variant="filled",id='Apply-strategy', color='yellow', n_clicks=0, size="sm")
+Runbot_input = dmc.Button("Start   Bot", variant="filled",id='run-input', color='red', n_clicks=0, size="sm")
 
-setting_page = html.Div([html.Div(id='loading'),
-                dbc.Row([
-                    html.Table([
-                            html.Td([
-                                html.H3('API Setting'),
-                                html.H5('Donate : XMR'),
-                                html.P('87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm')
-                            ]),
-                            html.Td([
-                                dcc.Link([
-                                    logoutBut
-                                ],href='/',refresh=True)
-                            ])
-                    ]),
-                ]),
-                dbc.Row([html.Hr(),html.Div(id='alert-su'),html.Hr(),
-                    html.Table([
-                            html.Td([Freebalance_input],style={'align-content': 'center'}),
-                            html.Td([minBalance_input],style={'align-content': 'center'})
-                            ]),
-                    html.Table([
-                            html.Td([API_KEY_input],style={'align-content': 'center'}),
-                            html.Td([API_SECRET_input],style={'align-content': 'center'})
-                            ]),
-                    html.Table([
-                            html.Td([NOTIFY_input],style={'align-content': 'center'}),
-                            # html.Td([],style={'align-content': 'center'})
-                            ]),
-                    passwd2_input,
-                    readyAPI_input,
-                    Sumkey_input,
-                    html.Hr(),
-                    html.H6('เข้าใช้งานครั้งแรกให้เปลี่ยนรหัสผ่านทันที!!!', style={'color': 'red'}),
-                    html.Div(id='alert-fai'),
-                    newUsername,
-                    passwd_input,
-                    passwd2_input,
-                    html.Table([
-                            html.Td([resetpass_input],style={'align-content': 'center'}),
-                            html.Td([html.H4('โปรดใช้งานบอทอย่างระมัดระวัง : Use as your own RISK')],style={'align-content': 'center'})
-                            ]),
-                ])
-                
-            ])
-botdata_page = html.Div([refresher_i,html.Div(id='alert-ta'),
-                dbc.Row([
-                    html.Table([
-                            html.Td([
-                                html.H3('API Setting'),
-                                html.H5('Donate : XMR'),
-                                html.P('87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm')
-                            ]),
-                            html.Table([
-                            html.Tr([refresh_table],style={'align-content': 'center'}),
-                            edit_input,
-                            html.Tr([edit_table],style={'align-content': 'center'})
-                            ])
+Leverage_input = dmc.NumberInput(
+    label="Leverage",
+    id='leverage-input',
+    value=50,
+    min=1,
+    max=125,
+    step=1,
+    style={"width": 75},
+)
+API_KEY_input = dmc.TextInput(label="API KEY", style={"width": 300},id='api-key-input', value='Binance API Key', type='text')
+API_SECRET_input = dmc.TextInput(label="API SECRET", style={"width": 300},id='api-secret-input', value='Binance API Secret Key', type='password')
+NOTIFY_input = dmc.TextInput(label="LINE : Notify", style={"width": 200},id='api-notify-input', value='Line Notify Key', type='text')
+
+Sumkey_input = dmc.Button("Apply Setting", variant="light",id='set-api-key', color='yellow', n_clicks=0)
+
+Freebalance_input = dmc.TextInput(label="Free Balance $", style={"width": 200},id='freebalance-input', value=f'Free Balance : วงเงินสำหรับบอท(Margin รวมทั้งหมด) ', type='text')
+minBalance_input = dmc.TextInput(label="Min Balance $", style={"width": 200},id='minBalance-input', value=f'Min Balance : ถ้าเงินเหลือต่ำกว่านี้บอทจะหยุดเข้า Position ', type='text')
+
+passwd_input = dmc.PasswordInput(placeholder="Password",style={"width": 300 },id='passwd-input',error=False,required= True)
+passwd2_input = dmc.PasswordInput(placeholder="Confirm Password",style={"width": 300 },id='repasswd2-input',error=False,required= True)
+passwdKey_input = dmc.PasswordInput(placeholder="Password",style={"width": 300 },id='repasswdKey-input',error=False,required= True)
+
+newUsername = dmc.TextInput(label="New Username", style={"width": 300},id='newUsername-input', value='Change new Username', type='text')
+
+EMAFAST_input = dmc.NumberInput(
+    label="EMA Fast",
+    id='emafast-input',
+    value=12,
+    min=1,
+    max=500,
+    step=1,
+    style={"width": 75},
+)
+EMASLOW_input = dmc.NumberInput(
+    label="EMA Slow",
+    id='emaslow-input',
+    value=26,
+    min=1,
+    max=500,
+    step=1,
+    style={"width": 75},
+)
+resetpass_input = html.Div([dbc.Button('Reset Password',id='resetpass-input', color='danger', name='RunBot', size="md", n_clicks=0)])
+logoutBut = dcc.Link([dmc.Button("Log Out", variant="light",id='logoutBut', color='red', n_clicks=0)],refresh=True , href='/',id='logoutLink')
+
+edit_table = dcc.ConfirmDialogProvider([dmc.Button("Edit Data", variant="light", color='red', n_clicks=0, size="md")],id='edit-table',message='ชัวร์แล้วนาาา?',submit_n_clicks=0)
+
+refresh_table = dmc.Button("Refresh", variant="light",id='update-table', color='green', n_clicks=0, size="md")
+
+ready_input = dmc.Switch(
+    size="sm",
+    radius="sm",
+    label="พร้อมแล้ว!",
+    checked=False,
+    id="ready-input")
+edit_input = dmc.Switch(
+    size="sm",
+    radius="sm",
+    label="ฉันได้ตรวจทานการตั้งค่าใหม่เรียบร้อยแล้ว",
+    checked=False,
+    id="edit-input")
+readyAPI_input = dmc.Switch(
+    size="sm",
+    radius="sm",
+    label="ฉันได้ตรวจทานความถูกต้องเรียบร้อยแล้ว และยอมรับว่า Vaz จะไม่รับผิดชอบเงินของคุณ",
+    checked=False,
+    id="readyAPI-input")
+
+refresher_i = dcc.Interval(id='update', interval=10000)
+
+
+login_page = dmc.Center([
+    dmc.Stack(
+    [
+        dmc.TextInput(id="user", placeholder="Enter Username", style={"width": 250}),
+        dmc.PasswordInput(placeholder="Your password",style={"width": 250 },id='passw',error=False,required= True),
+        dmc.Center([ dcc.Link([ dbc.Button('Log in',id='verify', color='danger', name='RunBot', size="lg", n_clicks=0, style={"width": 250})],href='/index',refresh=True)]),
+    ],style={"height": 500 , 'color':'white'}, align="stretch", justify="center")
+    ])
+
+
+index_page = dmc.MantineProvider([dmc.Header(
+    height=70,
+    fixed=False,
+    children=[
+        dmc.Container(
+            fluid= True,
+            children=dmc.Group(
+                position="apart",
+                align="flex-start",
+                children=[
+                    dmc.Center(
+                        dcc.Link(
+                            [
+                                html.H2('VXMA BOT')
+                            ],
+                            href="/index", refresh=True,
+                            style={"paddingTop": 5, "textDecoration": "none"},
+                        ),
+                    ),
+                    dmc.Group(
+                        position="right",
+                        align="flex-end",
+                        children=[
+                            dmc.Center(
+                                [dcc.Interval(id='session', interval=900000),html.Div(id='loading'),logoutBut]
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+    ],
+),dmc.Tabs(active= 0, color='green',id='tabs-one',grow=False,position="right",orientation="horizontal", children=[
+        dmc.Tab(label='Summary'),
+        dmc.Tab(label='VXMA bot'),
+        dmc.Tab(label='EMA bot'),
+        dmc.Tab(label='Running Bot'),
+        dmc.Tab(label='Setting'),
+    ]),dmc.Center(id='page-content-tabs')],theme={"colorScheme": "dark"},id='theme',styles={"height": "100%", "width": "98%"}
+    )
+
+Summary_page = dmc.Container([refresher_i,
+                dmc.Grid([
+                    dmc.Col([
+                        dmc.Text('Comming.. soon...', size="xl"),
+                        dmc.Text(' by Vaz.', size="sm")
                     ])
-                ]),html.Hr(),
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)
+                ,html.Hr(),
                 dbc.Row([
-                    html.Div(id='datatable')
+                    dmc.Grid([
+                    dmc.Col([
+                        
+                        ])
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)       
+                ])
+                ,html.Hr(),
+                dbc.Row([
+                    dmc.Paper(
+                        children=[dmc.Text('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm', size="xs")],
+                        shadow="xs",
+                    )
                 ])
                 
             ])
 
-main_index = html.Div([refresher_i,
-                dbc.Row([
-                    dbc.Col([
-                        num_bars_input,
-                        symbol_dropdown,
-                        timeframe_dropdown,
-                    ]),
-                    dbc.Col([
+
+vxma_page = dmc.Container([refresher_i,
+                dmc.Grid([
+                    dmc.Col([
+                        option_input,
+                    ],span=1),
+                    dmc.Col([
                         Margin_input,
                         RRTP1_input,
                         RRTP2_input,
-                    ]),
-                    dbc.Col([
+                    ],span=1),
+                    dmc.Col([
                         RISK_input,
                         perTP1_input,
                         perTP2_input
-                    ]),
-                    dbc.Col([
+                    ],span=1),
+                    dmc.Col([
                         Leverage_input,
-                        option_input,
-                    ]),
-                    dbc.Col([
+                        atr_input,
+                        atrm_input,
+                    ],span=1),
+                    dmc.Col([
                         Pivot_input,
                         RSI_input,
                         EMA_input,
-                    ]),
-                    dbc.Col([
+                    ],span=1),
+                    dmc.Col([
                         AOL_input,
                         SUBHAG_input,
                         SMOOTH_input
-                    ]),
-                    dbc.Col([
-                        atr_input,
-                        atrm_input,
-                        html.H5('ตรวจดูตั้งค่าอีกครั้ง!', style={'color': 'red'}),
-                    ]),
-                    dbc.Col([
-                        html.P('กด Apply ลองดูก่อน'),
-                        Apply_input,
-                        ready_input,
-                        Runbot_input,
+                    ],span=1),
+                    dmc.Col([
+                        dmc.Stack(
+                            [
+                                symbol_dropdown,
+                                Apply_input,
+                                ready_input,
+                                Runbot_input,
+                            ],
+                            align="flex-start",
+                            spacing="xs",
+                        ),
+                    ],span=1),
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)
+                ,html.Hr(),
+                dbc.Row([
+                    dcc.Graph(id='clientside-graph'),
+                    dcc.Store(id='clientside-store-figure'),             
+                ])
+                ,html.Hr(),
+                dbc.Row([
+                dmc.Grid([
+                    dmc.Col([
+                        html.H5('ตรวจดูตั้งค่าทุกครั้ง!!', style={'color': 'red'})
+                    ],span=1), 
+                    dmc.Col([
                         html.Div(id='alert-suc'),
-                    ]),
-                ])
+                    ],span=1),     
+                    dmc.Col([
+                        dmc.Group([timeframe_dropdown, num_bars_input]),
+                    ],span=1, offset=1),     
+                ],  justify="space-between",
+                    align="flex-end",
+                    gutter='md',
+                    grow=True)])
                 ,html.Hr(),
                 dbc.Row([
-                        html.Div(id='page-content')                
-                ])
-                ,html.Hr(),
-                dbc.Row([
-                    html.P('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm')
+                    dmc.Paper(
+                        children=[dmc.Text('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm', size="xs")],
+                        shadow="xs",
+                    )
                 ])
                 
             ])
 
-ema_index = html.Div([refresher_i,
-                dbc.Row([
-                    dbc.Col([
-                        num_bars_input,
-                        symbol_dropdown,
-                        timeframe_dropdown,
-                    ]),
-                    dbc.Col([
+
+EMA_page = dmc.Container([refresher_i,
+                dmc.Grid([
+                    dmc.Col([
+                        option_input,
+                    ],span=1),
+                    dmc.Col([
                         Margin_input,
                         RRTP1_input,
                         RRTP2_input,
-                    ]),
-                    dbc.Col([
+                    ],span=1),
+                    dmc.Col([
                         RISK_input,
                         perTP1_input,
                         perTP2_input
-                    ]),
-                    dbc.Col([
+                    ],span=1),
+                    dmc.Col([
                         Leverage_input,
-                        option_input,
-                    ]),
-                    dbc.Col([
                         EMAFAST_input,
                         EMASLOW_input,
-                    ]),
-                    dbc.Col([
-                        html.H1('DEMO!', style={'color': 'red'}),
-                        # html.H5('ตรวจดูตั้งค่าอีกครั้ง!', style={'color': 'red'}),
-                    ]),
-                    dbc.Col([
-                        html.P('กด Apply ลองดูก่อน'),
-                        Apply_input,
-                        ready_input,
+                    ],span=1),
+                    dmc.Col([
+                        dmc.Stack(
+                            [
+                                symbol_dropdown,
+                                Apply_input,
+                                ready_input,
+                                Runbot_input,
+                            ],
+                            align="flex-start",
+                            spacing="xs",
+                        ),
+                    ],span=1),
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)
+                ,html.Hr(),
+                dbc.Row([
+                    dcc.Graph(id='clientside-graph-ema'),
+                    dcc.Store(id='clientside-store-figure-ema'),           
+                ])
+                ,html.Hr(),
+                dbc.Row([
+                dmc.Grid([
+                    dmc.Col([
+                        html.H5('ตรวจดูตั้งค่าทุกครั้ง!!', style={'color': 'red'})
+                    ],span=1), 
+                    dmc.Col([
                         html.Div(id='alert-ema'),
-                    ]),
-                ])
+                    ],span=1),     
+                    dmc.Col([
+                        dmc.Group([timeframe_dropdown, num_bars_input]),
+                    ],span=1, offset=1),     
+                ],  justify="space-between",
+                    align="flex-end",
+                    gutter='md',
+                    grow=True)])
                 ,html.Hr(),
                 dbc.Row([
-                        html.Div(id='page-content2')                
-                ])
-                ,html.Hr(),
-                dbc.Row([
-                    html.P('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm')
+                    dmc.Paper(
+                        children=[dmc.Text('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm', size="xs")],
+                        shadow="xs",
+                    )
                 ])
                 
             ])
+
+RunningBot_page = dmc.Container([refresher_i,
+                dmc.Grid([
+                    dmc.Col([
+                        refresh_table,
+                    ], span=1),
+                    dmc.Col([
+                        dmc.Center(id='alert-fai'),
+                    ], span=1),
+                    dmc.Col([
+                        edit_input,
+                    ], span=1),
+                    dmc.Col([
+                        edit_table,
+                    ], span=1)
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)
+                ,html.Hr(),
+                dbc.Row([
+                    dmc.Center(id='datatable')        
+                ])
+                ,html.Hr(),
+                dbc.Row([
+                    dmc.Paper(
+                        children=[dmc.Text('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm', size="xs")],
+                        shadow="xs",
+                    )
+                ])
+                
+            ])
+
+
+Setting_page = dmc.Container([refresher_i,
+                dmc.Grid([
+                    dmc.Col([
+                        dmc.Group([Freebalance_input, minBalance_input,NOTIFY_input]),
+                        dmc.Group([API_KEY_input, API_SECRET_input]),
+                        dmc.Group([passwdKey_input, readyAPI_input]),
+                        dmc.Center(id='alert-su'),
+                        Sumkey_input
+                    ])
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)
+                ,html.Hr(),
+                dbc.Row([
+                    dmc.Grid([
+                    dmc.Col([
+                        dmc.Group([newUsername, html.H6('เข้าใช้งานครั้งแรกให้เปลี่ยนรหัสผ่านทันที!!!', style={'color': 'red'})]),
+                        dmc.Group([passwd_input, html.Td([html.H6('โปรดใช้งานบอทอย่างระมัดระวัง : Use as your own RISK')])]),
+                        dmc.Group([passwd2_input]),
+                        dmc.Center(id='alert-fai'),
+                        resetpass_input
+                    ])
+                ],  justify="space-between",
+                    align="flex-start",
+                    gutter='md',
+                    grow=True)       
+                ])
+                ,html.Hr(),
+                dbc.Row([
+                    dmc.Paper(
+                        children=[dmc.Text('by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm', size="xs")],
+                        shadow="xs",
+                    )
+                ])
+                
+            ])
+
+
+
+
 # creates the Dash App
-app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG],suppress_callback_exceptions=True, title='VXMA Bot', update_title=None, background_callback_manager=background_callback_manager)
-register_page("VXMA", path='/index', layout=main_page)
-app.layout = html.Div([dcc.Location(id='url', refresh=True),html.Div(id='page-content-login')])
-#logout button
+app = Dash(__name__, external_stylesheets=[dbc.themes.CYBORG], title='VXMA Bot', update_title=None, background_callback_manager=background_callback_manager) #,suppress_callback_exceptions=True
+register_page("VXMA", path='/index', layout=index_page)
+register_page("Login", path='/login', layout=login_page)
+app.layout = dmc.MantineProvider(
+    children=[
+            dcc.Location(id='url', refresh=True),
+            dmc.Container(id='page-content-login'),
+            ],theme={"colorScheme": "dark"},id='theme',styles={"height": "100%", "width": "98%"}
+    )
+
+# #logout button
 @app.callback(
     Output('loading', 'children'),
-    Input('session', 'n_intervals'),
     Input('logoutBut', 'n_clicks'))
-def logout(n,click):
-    if click is not None or n is not None:
-        insession['name'] = False
-        return 'loged out'
+def logout(click):
+    if click is not None and insession['name']:
+        insession['name']=False
+        return 'loged In'
+    elif click is not None:
+        insession['name']=False
+        return 'loged Out'
     else:
-        return PreventUpdate
-    
-#login page
+        return ''
+
+#login page, dmc.Space(h=70)
 @app.callback(
-    Output('output1', 'children'),
+    Output('passw', 'error'),
+    Output('passw', 'value'),
     Input('verify', 'n_clicks'),
     State('user', 'value'),
     State('passw', 'value'))
@@ -1245,49 +1540,50 @@ def update_output(n_clicks, uname, passw):
     config = pd.read_sql('SELECT * FROM user',con=con)
     li = config['id'][0]
     if uname =='' or uname == None or passw =='' or passw == None:
-        return html.Div(children='',style={'padding-left':'550px','padding-top':'10px'})
+        return 'Invalid Username' , ''
     elif uname != li:
-        return html.Div(children='Incorrect Username',style={'padding-left':'550px','padding-top':'40px','font-size':'16px'})
+        return 'Incorrect Username' , ''
     elif perf(uname, passw):
         insession['name'] = True
-        return html.Div(children='Loged-In ',style={'padding-left':'550px','padding-top':'40px','font-size':'16px'})
+        return 'Loged-In' , ''
     elif insession['name']:
-        return main_page
+        return 'Already Loged in' , ''
     else:
-        return html.Div(children='Incorrect Password',style={'padding-left':'550px','padding-top':'40px','font-size':'16px'})
-#tab component
-@app.callback(
-    Output('tabs-content-1', 'children'),
-    Input('tabs-one', 'value'))
-def display_page(tab):
-    if tab == 'tab-4':
-        return summary_page
-    elif tab == 'tab-1':
-        return main_index
-    elif tab == 'tab-2':
-        return botdata_page
-    elif tab == 'tab-3': 
-        return setting_page
-    elif tab == 'tab-5':
-        return ema_index
-    else:
-        return '404'
-#url condition
+        return 'Incorrect Password' , ''
+
+# #url condition
 @app.callback(
     Output('page-content-login', 'children'),
     Input('url', 'pathname'))
 def pathname_page(pathname):
     if pathname == '/index' and insession['name']:
-        return main_page
-    elif insession['name']:
-        return main_page
-    elif not insession['name']:
         return index_page
+    elif pathname == '/' and insession['name']:
+        return index_page
+    elif pathname == '/' and not insession['name']:
+        return login_page
+    elif not insession['name']:
+        return login_page
     else:
         return 'Code : 404'
+
+@app.callback(
+    Output('page-content-tabs','children'),
+    Input('tabs-one','active'))
+def tabs(tabs):
+    if tabs == 1:
+        return vxma_page
+    elif tabs == 2:
+        return EMA_page
+    elif tabs == 3:
+        return RunningBot_page
+    elif tabs == 4:
+        return Setting_page
+    else: return Summary_page
+
 #VXMA strategy
 @app.callback(
-    Output('page-content', 'children'),
+    Output('clientside-store-figure', 'data'),
     Input('update', 'n_intervals'),
     Input('Apply-strategy', 'n_clicks'),
     State('symbol-dropdown', 'value'),
@@ -1301,7 +1597,6 @@ def pathname_page(pathname):
     State('RSI-input', 'value'),
     State('Andean-Oscillator-input', 'value'),
     State('Pivot-lookback-input', 'value'),
-    background=True,
     prevent_initial_call=True)
 def update_VXMA_chart(interval, click, symbol, timeframe, zoom, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, pivot):
     timeframe = TIMEFRAMES_DICT[timeframe]
@@ -1314,7 +1609,7 @@ def update_VXMA_chart(interval, click, symbol, timeframe, zoom, atr_input, atrM_
     df = pd.DataFrame(bars, columns=['timestamp', 'Open', 'High', 'Low', 'Close', 'Volume'])
     df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True).map(lambda x: x.tz_convert('Asia/Bangkok'))
     df = df.set_index('timestamp')
-    df = indi.vxma(df, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, pivot)
+    df = indi.indicator(df, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, pivot)
     data = df.tail(num_bars)
     fig = go.Figure(data=go.Candlestick(x=data.index,
                     open=data['Open'],
@@ -1338,10 +1633,33 @@ def update_VXMA_chart(interval, click, symbol, timeframe, zoom, atr_input, atrM_
     fig.update_layout(yaxis={'side': 'right'})
     fig.layout.xaxis.fixedrange = True
     fig.layout.yaxis.fixedrange = True
-    return [dcc.Graph(figure=fig, config={'displayModeBar': False})]
+    return fig
+
+# Clientside callback
+app.clientside_callback(
+    """
+    function(figure_data, title_text) {
+        if(figure_data === undefined) {
+            return {'data': [], 'layout': {}};
+        }
+        const fig = Object.assign({}, figure_data, {
+                'layout': {
+                    ...figure_data.layout,
+                    'title': {
+                        ...figure_data.layout.title, text: title_text
+                    }
+                }
+        });
+        return fig;
+    }
+    """,
+    Output('clientside-graph', 'figure'),
+    Input('clientside-store-figure', 'data'),
+)
+
 #EMA strategy
 @app.callback(
-    Output('page-content2', 'children'),
+    Output('clientside-store-figure-ema', 'data'),
     Input('update', 'n_intervals'),
     Input('Apply-strategy', 'n_clicks'),
     State('symbol-dropdown', 'value'),
@@ -1349,8 +1667,7 @@ def update_VXMA_chart(interval, click, symbol, timeframe, zoom, atr_input, atrM_
     State('num-bar-input', 'value'),
     State('emafast-input', 'value'),
     State('emaslow-input', 'value'),
-    prevent_initial_call=True,
-    background=True)
+    prevent_initial_call=True)
 def update_EMA_chart(interval, click, symbol, timeframe, zoom, emafast, emaslow):
     timeframe = TIMEFRAMES_DICT[timeframe]
     num_bars = ZOOM_DICT[zoom]
@@ -1384,8 +1701,31 @@ def update_EMA_chart(interval, click, symbol, timeframe, zoom, emafast, emaslow)
     fig.update_layout(yaxis={'side': 'right'})
     fig.layout.xaxis.fixedrange = True
     fig.layout.yaxis.fixedrange = True
-    return [dcc.Graph(figure=fig, config={'displayModeBar': False})]  
-#VXMA excute bot
+    return fig
+# Clientside callback
+app.clientside_callback(
+    """
+    function(figure_data, title_text) {
+        if(figure_data === undefined) {
+            return {'data': [], 'layout': {}};
+        }
+        const fig = Object.assign({}, figure_data, {
+                'layout': {
+                    ...figure_data.layout,
+                    'title': {
+                        ...figure_data.layout.title, text: title_text
+                    }
+                }
+        });
+        return fig;
+    }
+    """,
+    Output('clientside-graph-ema', 'figure'),
+    Input('clientside-store-figure-ema', 'data'),
+)
+
+
+# #VXMA excute bot
 @app.callback(
     Output('alert-suc', 'children'),
     Input('run-input', 'submit_n_clicks'),
@@ -1398,7 +1738,6 @@ def update_EMA_chart(interval, click, symbol, timeframe, zoom, emafast, emaslow)
     State('SMOOTH-input', 'value'),
     State('RSI-input', 'value'),
     State('Andean-Oscillator-input', 'value'),
-    State('switches-input' , 'value'),
     State('leverage-input', 'value'),
     State('Pivot-lookback-input', 'value'),
     State('RR-TP1-input', 'value'),
@@ -1407,20 +1746,19 @@ def update_EMA_chart(interval, click, symbol, timeframe, zoom, emafast, emaslow)
     State('per-TP2-input', 'value'),
     State('Risk-input', 'value'),
     State('maxmargin-input', 'value'),
-    State('ready-input', 'value'),
-    background=True,
-    prevent_initial_call=True)
-def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, switches, leverage, Pivot, RR1, RR2, TP1, TP2, Risk,maxMargin, ready):
+    State('ready-input', 'checked'),
+    State('Long-input' , 'checked'),
+    State('Short-input' , 'checked'),
+    State('TP1-input' , 'checked'),
+    State('TP2-input' , 'checked'),
+    State('Stop-input' , 'checked'),
+    State('Tailing-input' , 'checked'),
+    background=True)
+def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, leverage, Pivot, RR1, RR2, TP1, TP2, Risk,maxMargin, ready, ul, us, tp, tp2, sl, tsl):
     if click is not None:
         data = pd.DataFrame(columns=BOTCOL)
-        ok = True if 'pass' in ready else False
-        if ok:
+        if ready:
             try:
-                ul = True if 'ul' in switches else False
-                us = True if 'us' in switches else False
-                tp = True if 'tp' in switches else False
-                sl = True if 'sl' in switches else False
-                tsl= True if 'tsl' in switches else False
                 id = f'{symbol}_{timeframe}'
                 compo = [id, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, smooth, rsi_ip, aol_ip, ul, us, tp , sl, tsl, leverage, Pivot, RR1, RR2, TP1, TP2, Risk, maxMargin]
                 data.loc[1] = compo
@@ -1434,7 +1772,7 @@ def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, s
         else:
             return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
     else:
-        return  PreventUpdate
+        return  [dbc.Alert("Wellcome.", dismissable=True, duration=5000, is_open=True, color='info')]
 #api setting
 @app.callback(
     Output('alert-su', 'children'),
@@ -1444,18 +1782,17 @@ def excuteBot(click, symbol, timeframe, atr_input, atrM_input, ema_ip, subhag, s
     State('api-key-input', 'value'),
     State('api-secret-input', 'value'),
     State('api-notify-input', 'value'),
-    State('repasswd2-input', 'value'),
-    State('readyAPI-input', 'value'),
-    background=True,
-    prevent_initial_call=True)
+    State('repasswdKey-input', 'value'),
+    State('readyAPI-input', 'checked'),
+    prevent_initial_call=True,
+    background=True)
 def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
     if click is not None:
         data = pd.DataFrame(columns=['freeB','minB','apikey','apisec','notify'])
-        ok = True if 'pass' in ready else False
         config = pd.read_sql('SELECT * FROM user',con=con)
         id = config['id'][0]
         valit = True if perf(id, pwd) else False
-        if ok and valit:
+        if ready and valit:
             try:
                 compo = [freeB, minB, api_key, apiZ, notifykey]
                 data.loc[1] = compo
@@ -1470,15 +1807,15 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
             return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
     else:
         return PreventUpdate
-#reset user pass
+# #reset user pass
 @app.callback(
     Output('alert-fai', 'children'),
     Input('resetpass-input', 'n_clicks'),
     State('passwd-input', 'value'),
-    State('repasswd2-input', 'value'),
+    State('repasswd-input', 'value'),
     State('newUsername-input', 'value'),
-    background=True,
-    prevent_initial_call=True)
+    prevent_initial_call=True,
+    background=True)
 def resetpwd(click, pwd1, pwd2, id):
     if click is not None:
         data = pd.DataFrame(columns=['id','pass'])
@@ -1499,7 +1836,7 @@ def resetpwd(click, pwd1, pwd2, id):
             return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
     else:
         return PreventUpdate
-#read data running bot
+# #read data running bot
 @app.callback(
 Output('datatable', 'children'),
 Input('update-table', 'n_clicks'),
@@ -1511,23 +1848,21 @@ def runningBot(click):
         return dash_table.DataTable(data=symbolist.to_dict('records'),columns=[{"name": i, "id": i} for i in symbolist],page_current=0,page_size=99,page_action='custom',editable=True, id='datatable', style_table={'color':'black'})
     else:
         return PreventUpdate
-#write data edit running bot
+# #write data edit running bot
 @app.callback(
 Output('alert-ta', 'children'),
 Input('edit-table', 'submit_n_clicks'),
 State('datatable', 'data'),
-State('edit-input', 'value'),
+State('edit-input', 'checked'),
 background=True,
 prevent_initial_call=True)
 def edit_menu(click, rows, ready):
     if click is not None and ready is not None:
-        ok = True if 'pass' in ready else False
-        if ok:
+        if ready:
             try:
                 df = pd.DataFrame(rows, columns=BOTCOL)
                 df = df.set_index('id')
                 df.to_sql('Bot', con=con, if_exists='replace', index_label='id')
-                data = pd.read_sql(f'SELECT * FROM Bot',con=con)
                 return [dbc.Alert("Success.", dismissable=True, duration=5000, is_open=True)]
             except Exception as e:
                 print(e)
@@ -1538,14 +1873,10 @@ def edit_menu(click, rows, ready):
         return [dbc.Alert("Ops! Something went wrong, Please retry.", dismissable=True, duration=5000, is_open=True, color='danger')]
 
 
-def buildapp(app):
-    th = Thread(target=run)
-    th.start()
-    th.join()
-    app = app.server
-    return app
-
-server = buildapp(app)
 if __name__ == "__main__":
-    app.run_server()
+    # th = Thread(target=run)
+    # th.start()
+    app.run(debug=True)
+    # th.join()
+    
         
