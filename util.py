@@ -74,7 +74,7 @@ def andean(close, open, aol_ip, m):
                 Close[i] * Close[i], Open[i] * Open[i],
                 dn2[i - 1] + (Close[i] * Close[i] - dn2[i - 1]) * alpha))
             # up1[i-1] := nz(math.max(C, O, up1[1] - (up1[1] - C) * alpha), C)
-            up11 = up1[i] = up11 if up22 is not np.nan else Close[i]
+            up11 = up1[i] = up11 if up11 is not np.nan else Close[i]
             # up2[i-1] := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C) * alpha), C * C)
             up22 = up2[i] = up22 if up22 is not np.nan else Close[i] * Close[i]
             # dn1[i-1] := nz(math.min(C, O, dn1[1] + (C - dn1[1]) * alpha), C)
