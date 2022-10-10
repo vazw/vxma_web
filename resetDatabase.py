@@ -1,29 +1,33 @@
 import sqlite3
-import pandas as pd
+
 import bcrypt
-con = sqlite3.connect('vxma.db')
+import pandas as pd
+
+con = sqlite3.connect("vxma.db")
 cur = con.cursor()
 
 barsC = 1502
-pwd = 'vxmaBot'
-id = 'vxma'
+pwd = "vxmaBot"
+id = "vxma"
+
 
 def cooking(id, pwd):
-    pepper = f'{id}{pwd}!{barsC}vz{id}'
-    bytePwd = pepper.encode('utf-8')
+    pepper = f"{id}{pwd}!{barsC}vz{id}"
+    bytePwd = pepper.encode("utf-8")
     Salt = bcrypt.gensalt(rounds=12)
     return bcrypt.hashpw(bytePwd, Salt)
 
-dropuser = 'DROP TABLE user'
-dropkey = 'DROP TABLE key'
-dropbot = 'DROP TABLE Bot'
 
-#2
+dropuser = "DROP TABLE user"
+dropkey = "DROP TABLE key"
+dropbot = "DROP TABLE Bot"
+
+# 2
 sql_create_users = """CREATE TABLE IF NOT EXISTS user (
                                     id text PRIMARY KEY,
                                     pass text NOT NULL
                                 )"""
-#5
+# 5
 sql_create_key = """CREATE TABLE IF NOT EXISTS key (
                                     freeB TEXT NOT NULL,
                                     minB REAL NOT NULL,
@@ -31,7 +35,7 @@ sql_create_key = """CREATE TABLE IF NOT EXISTS key (
                                     apisec TEXT NOT NULL,
                                     notify TEXT NOT NULL
                                 )"""
-#22
+# 22
 sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS Bot (
                                     id TEXT NOT NULL PRIMARY KEY,
                                     symbol TEXT NOT NULL,
@@ -58,64 +62,74 @@ sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS Bot (
                                     maxMargin TEXT NOT NULL
                                 )"""
 
+
 def cUser():
     try:
         cur.execute(sql_create_users)
         con.commit()
-        print('success : user')
+        print("success : user")
     except sqlite3.Error as e:
         print(e)
-        print('Fail to create table : user')
+        print("Fail to create table : user")
+
+
 def cKey():
     try:
         cur.execute(sql_create_key)
         con.commit()
-        print('success : key')
+        print("success : key")
     except sqlite3.Error as e:
         print(e)
-        print('Fail to create table : key')
+        print("Fail to create table : key")
+
+
 def cBot():
     try:
         cur.execute(sql_create_tasks_table)
         con.commit()
-        print('success : Bot')
+        print("success : Bot")
     except sqlite3.Error as e:
         print(e)
-        print('Fail to create table : Bot')
+        print("Fail to create table : Bot")
+
+
 def newUser():
     try:
-        data = pd.DataFrame(columns=['id','pass'])
+        data = pd.DataFrame(columns=["id", "pass"])
         cook = cooking(id, pwd)
         compo = [id, cook]
         data.loc[1] = compo
-        data = data.set_index('id')
-        data.to_sql('user', con=con, if_exists='replace', index=True, index_label='id')
-        print('success : RESET')
+        data = data.set_index("id")
+        data.to_sql(
+            "user", con=con, if_exists="replace", index=True, index_label="id"
+        )
+        print("success : RESET")
     except sqlite3.Error as e:
         print(e)
-        print('fail')
+        print("fail")
+
+
 def dropT():
     try:
         cur.execute(dropuser)
         cur.execute(dropkey)
         cur.execute(dropbot)
         con.commit()
-        print('success : Drop')
+        print("success : Drop")
     except sqlite3.Error as e:
         print(e)
-        print('Fail to drop table!')
+        print("Fail to drop table!")
 
 
 def main():
     dropT()
     cUser()
-    newUser()    
     cKey()
-    cBot()
+    newUser()
+    # cBot()
+
+
 main()
-
-
-
 
 
 # def insert():
@@ -134,5 +148,5 @@ main()
 #     except sqlite3.Error as e:
 #         print(e)
 #         print('fail')
-        
+
 # insert()

@@ -10,4 +10,5 @@ dash[celery]
 plotly
 dash_bootstrap_components
 bcrypt
-gunicorn
+dash_mantine_components
+
