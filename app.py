@@ -12,7 +12,6 @@ import ccxt.async_support as ccxt
 import mplfinance as mplf
 import pandas as pd
 from line_notify import LineNotify
-from tabulate import tabulate
 
 from vxmatalib import benchmarking as ta_score
 from vxmatalib import vxma as ta
@@ -299,7 +298,6 @@ async def get_symbol():
             newsym.append(symbolist["symbol"][i])
     for symbol in symbols.index:
         newsym.append(symbol)
-    print(tabulate(symbols, headers="keys", tablefmt="grid"))
     newsym = list(dict.fromkeys(newsym))
     print(f"Interested : {newsym}")
     return newsym
@@ -1000,7 +998,7 @@ async def feed(df, risk_manage):
     is_in_Long = False
     is_in_Short = False
     is_in_position = False
-    posim = risk_manage.symbol.replace("/", "")
+    posim = risk_manage["symbol"].replace("/", "")
     exchange = await connect()
     try:
         balance = await exchange.fetch_balance()
@@ -1364,19 +1362,21 @@ async def main():
                     "USESHORT": USESHORT,
                     "leverage": symbolist["leverage"][i],
                 }
+                for x in risk_manage:
+                    print(risk_manage[x], type(risk_manage[x]))
                 data = await fetchbars(symbol, tf)
                 bot = ta(data, ta_table)
                 data = bot.indicator()
                 await asyncio.gather(feed(data, risk_manage))
                 await asyncio.sleep(5)
-                botStatus = "Bot is running..."
+                print("Bot is running...")
             except Exception as e:
                 print(e)
                 pass
         await asyncio.sleep(30)
     else:
         await asyncio.sleep(59)
-        botStatus = "Nothing to do now....."
+        print("Nothing to do now.....")
 
 
 async def async_main():

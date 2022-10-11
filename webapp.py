@@ -24,7 +24,6 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from line_notify import LineNotify
 
-from util import ema as sEMA
 from vxmatalib import vxma as indi
 
 launch_uid = uuid4()
@@ -1804,3 +1803,20 @@ def edit_menu(click, rows, ready):
 
 if __name__ == "__main__":
     app.run(debug=True)
+    # risk_manage = {
+    #     "symbol": symbol,
+    #     "tf": tf,
+    #     "RISK": str(symbolist["Risk"][i]),
+    #     "Max_Size": Max_Size,
+    #     "TPPer": symbolist["TP1"][i],
+    #     "TPPer2": symbolist["TP2"][i],
+    #     "USETP": USETP,
+    #     "USETP2": USETP2,
+    #     "USESL": USESL,
+    #     "Tailing_SL": Tailing_SL,
+    #     "TPRR1": symbolist["RR1"][i],
+    #     "TPRR2": symbolist["RR2"][i],
+    #     "USELONG": USELONG,
+    #     "USESHORT": USESHORT,
+    #     "leverage": symbolist["leverage"][i],
+    # }
