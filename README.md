@@ -32,4 +32,6 @@ password = 'vxmaBot'
 > let's begin our journey to financial freedom! 
 |- 0.1.0 start! <br />
 
-![image](https://user-images.githubusercontent.com/8637706/189532236-3179bb60-919c-4946-bb5f-676ccaa3380c.png)
+[![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)
+
+
