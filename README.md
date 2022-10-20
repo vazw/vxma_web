@@ -1,7 +1,7 @@
-# vxma_web
-web app version beta
+# VXMA Trading
+web app bot-trading version beta
 
-### defualt 
+### default 
 User = 'vxma'
 password = 'vxmaBot'
 
@@ -29,7 +29,7 @@ password = 'vxmaBot'
 |- minimum balance to execute open position <br/>
 
 ## Changelog
-|- let's begin our journey to financial freedom! <br/>
-
+> let's begin our journey to financial freedom! 
+|- 0.1.0 start! <br />
 
 ![image](https://user-images.githubusercontent.com/8637706/189532236-3179bb60-919c-4946-bb5f-676ccaa3380c.png)
