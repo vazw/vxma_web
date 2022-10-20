@@ -29,7 +29,8 @@ password = 'vxmaBot'
 |- minimum balance to execute open position <br/>
 
 ## Changelog
-> let's begin our journey to financial freedom! 
+> let's begin our journey to financial freedom!
+
 |- 0.1.0 start! <br />
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)
