@@ -13,6 +13,7 @@ import mplfinance as mplf
 import pandas as pd
 from line_notify import LineNotify
 
+from appdata import risk_manage, ta_table
 from vxmatalib import benchmarking as ta_score
 from vxmatalib import vxma as ta
 
@@ -34,6 +35,47 @@ rcs = {
     "grid.linestyle": ":",
     "axes.titlesize": "xx-large",
     "axes.titleweight": "bold",
+}
+
+# Bot setting
+insession = dict(name=False, day=False, hour=False)
+# STAT setting
+barsC = 1502
+msg = ""
+# timframe dicts and collum
+TIMEFRAMES = [
+    "1m",
+    "3m",
+    "5m",
+    "15m",
+    "30m",
+    "1h",
+    "2h",
+    "4h",
+    "6h",
+    "8h",
+    "12h",
+    "1d",
+    "3d",
+    "1w",
+    "1M",
+]
+TIMEFRAMES_DICT = {
+    "1m": "1m",
+    "3m": "3m",
+    "5m": "5m",
+    "15m": "15m",
+    "30m": "30m",
+    "1h": "1h",
+    "2h": "2h",
+    "4h": "4h",
+    "6h": "6h",
+    "8h": "8h",
+    "12h": "12h",
+    "1d": "1d",
+    "3d": "3d",
+    "1w": "1w",
+    "1M": "1M",
 }
 
 
@@ -87,75 +129,6 @@ def get_config():
 
 
 get_config()
-
-
-# Bot setting
-insession = dict(name=False, day=False, hour=False)
-# STAT setting
-barsC = 1502
-msg = ""
-# timframe dicts and collum
-ZOOM_DICT = {"X1": 500, "X2": 250, "X3": 180, "X4": 125, "X5": 50}
-TIMEFRAMES = [
-    "1m",
-    "3m",
-    "5m",
-    "15m",
-    "30m",
-    "1h",
-    "2h",
-    "4h",
-    "6h",
-    "8h",
-    "12h",
-    "1d",
-    "3d",
-    "1w",
-    "1M",
-]
-TIMEFRAMES_DICT = {
-    "1m": "1m",
-    "3m": "3m",
-    "5m": "5m",
-    "15m": "15m",
-    "30m": "30m",
-    "1h": "1h",
-    "2h": "2h",
-    "4h": "4h",
-    "6h": "6h",
-    "8h": "8h",
-    "12h": "12h",
-    "1d": "1d",
-    "3d": "3d",
-    "1w": "1w",
-    "1M": "1M",
-}
-BOTCOL = [
-    "id",
-    "symbol",
-    "timeframe",
-    "ATR",
-    "ATR_m",
-    "EMA",
-    "subhag",
-    "smooth",
-    "RSI",
-    "Andean",
-    "Uselong",
-    "Useshort",
-    "UseTP",
-    "UseTP2",
-    "UseSL",
-    "Tail_SL",
-    "leverage",
-    "Pivot",
-    "RR1",
-    "RR2",
-    "TP1",
-    "TP2",
-    "Risk",
-    "maxMargin",
-]
 
 
 def cooking(id, pwd):
@@ -937,12 +910,12 @@ async def CloseShort(df, balance, symbol, amt, pnl, exchange, Sside, tf):
         total = float(balance["total"]["USDT"])
         msg = (
             "BINANCE:\n"
-            + f"Coin        : {symbol}\n"
-            + "Status      : CloseLong[SELL]\n"
-            + f"Amount      : {str(amount)}({round((amount * ask), 2)}USDT)\n"
-            + f"Price       : {ask} USDT\n"
-            + f"Realized P/L:  {round(upnl, 2)}USDT\n"
-            + f"Balance     : {round(total, 2)}USDT"
+            f"Coin        : {symbol}\n"
+            "Status      : CloseLong[SELL]\n"
+            f"Amount      : {str(amount)}({round((amount * ask), 2)}USDT)\n"
+            f"Price       : {ask} USDT\n"
+            f"Realized P/L:  {round(upnl, 2)}USDT\n"
+            f"Balance     : {round(total, 2)}USDT"
         )
         notify.send(msg)
         candle(df, symbol, tf)
@@ -952,11 +925,11 @@ async def CloseShort(df, balance, symbol, amt, pnl, exchange, Sside, tf):
     return
 
 
-async def bot_1(symbol, ta_table, tf):
+async def bot_1(symbol, ta_data, tf):
     try:
         print("Bot 1 is running...")
         data1 = await fetchbars(symbol, tf)
-        bot1 = ta(data1, ta_table)
+        bot1 = ta(data1, ta_data)
         data1 = bot1.indicator()
         print("Bot 1 is Done!")
         return data1
@@ -965,11 +938,11 @@ async def bot_1(symbol, ta_table, tf):
         pass
 
 
-async def bot_2(symbol, ta_table, tf):
+async def bot_2(symbol, ta_data, tf):
     try:
         print("Bot 2 is running...")
         data2 = await fetchbars(symbol, tf)
-        bot2 = ta(data2, ta_table)
+        bot2 = ta(data2, ta_data)
         data2 = bot2.indicator()
         print("Bot 2 is Done!")
         return data2
@@ -978,11 +951,11 @@ async def bot_2(symbol, ta_table, tf):
         pass
 
 
-async def bot_3(symbol, ta_table, tf):
+async def bot_3(symbol, ta_data, tf):
     try:
         print("Bot 3 is running...")
         data3 = await fetchbars(symbol, tf)
-        bot3 = ta(data3, ta_table)
+        bot3 = ta(data3, ta_data)
         data3 = bot3.indicator()
         print("Bot 3 is Done!")
         return data3
@@ -992,9 +965,6 @@ async def bot_3(symbol, ta_table, tf):
 
 
 async def feed(df, risk_manage):
-    # symbol, tf, RISK, Max_Size, TPPer, TPPer2,
-    # USETP, USETP2, USESL, Tailing_SL, TPRR1, TPRR2,
-    # USELONG, USESHORT, leverage
     is_in_Long = False
     is_in_Short = False
     is_in_position = False
@@ -1138,22 +1108,13 @@ async def get_dailytasks():
     daycollum = ["Symbol", "LastPirce", "Long-Term", "Mid-Term", "Short-Term"]
     dfday = pd.DataFrame(columns=daycollum)
     symbolist = await get_symbol()
-    ta_table = dict(
-        atr_p=12,
-        atr_m=1.6,
-        ema=30,
-        linear=30,
-        smooth=30,
-        rsi=25,
-        aol=30,
-        pivot=60,
-    )
+    ta_data = ta_table()
     for symbol in symbolist:
         try:
             df1, df2, df3 = await asyncio.gather(
-                bot_1(symbol, ta_table, "1d"),
-                bot_2(symbol, ta_table, "6h"),
-                bot_3(symbol, ta_table, "1h"),
+                bot_1(symbol, ta_data, "1d"),
+                bot_2(symbol, ta_data, "6h"),
+                bot_3(symbol, ta_data, "1h"),
             )
 
             candle(df1, symbol, "1d")
@@ -1288,86 +1249,27 @@ async def main():
             notify.send(msg, sticker_id=10863, package_id=789)
             insession["hour"] = True
         exchange.precisionMode = ccxt.DECIMAL_PLACES
-        free = float(balance["free"]["USDT"])
+        free_balance = float(balance["free"]["USDT"])
         await disconnect(exchange)
         for i in range(len(symbolist.index)):
             try:
-                USELONG = (
-                    True
-                    if str(symbolist["Uselong"][i]).lower() == "true"
-                    else False
+                ta_table_data = ta_table(
+                    symbolist["ATR"][i],
+                    symbolist["ATR_m"][i],
+                    symbolist["EMA"][i],
+                    symbolist["subhag"][i],
+                    symbolist["smooth"][i],
+                    symbolist["RSI"][i],
+                    symbolist["Andean"][i],
+                    symbolist["Pivot"][i],
                 )
-                USESHORT = (
-                    True
-                    if str(symbolist["Useshort"][i]).lower() == "true"
-                    else False
+                risk_manage_data = risk_manage(symbolist[i], free_balance)
+                data = await fetchbars(
+                    risk_manage_data.symbol, risk_manage_data.timeframe
                 )
-                USETP = (
-                    True
-                    if str(symbolist["UseTP"][i]).lower() == "true"
-                    else False
-                )
-                USETP2 = (
-                    True
-                    if str(symbolist["UseTP2"][i]).lower() == "true"
-                    else False
-                )
-                USESL = (
-                    True
-                    if str(symbolist["UseSL"][i]).lower() == "true"
-                    else False
-                )
-                Tailing_SL = (
-                    True
-                    if str(symbolist["Tail_SL"][i]).lower() == "true"
-                    else False
-                )
-                Max_Size = str(symbolist["maxMargin"][i])
-                if Max_Size[0] == "$":
-                    Max_Size = float(Max_Size[1 : len(Max_Size)])
-                elif Max_Size[0] == "%":
-                    size = float(Max_Size[1 : len(Max_Size)])
-                    Max_Size = free * (size / 100)
-                else:
-                    Max_Size = float(Max_Size)
-                symbol = symbolist["symbol"][i]
-                if symbol[0:4] == "1000":
-                    symbol = symbol[4 : len(symbol)]
-                tf = symbolist["timeframe"][i]
-                ta_table = {
-                    "atr_p": symbolist["ATR"][i],
-                    "atr_m": symbolist["ATR_m"][i],
-                    "ema": symbolist["EMA"][i],
-                    "linear": symbolist["subhag"][i],
-                    "smooth": symbolist["smooth"][i],
-                    "rsi": symbolist["RSI"][i],
-                    "aol": symbolist["Andean"][i],
-                    "pivot": symbolist["Pivot"][i],
-                }
-
-                risk_manage = {
-                    "symbol": symbol,
-                    "tf": tf,
-                    "RISK": str(symbolist["Risk"][i]),
-                    "Max_Size": Max_Size,
-                    "TPPer": symbolist["TP1"][i],
-                    "TPPer2": symbolist["TP2"][i],
-                    "USETP": USETP,
-                    "USETP2": USETP2,
-                    "USESL": USESL,
-                    "Tailing_SL": Tailing_SL,
-                    "TPRR1": symbolist["RR1"][i],
-                    "TPRR2": symbolist["RR2"][i],
-                    "USELONG": USELONG,
-                    "USESHORT": USESHORT,
-                    "leverage": symbolist["leverage"][i],
-                }
-                for x in risk_manage:
-                    print(risk_manage[x], type(risk_manage[x]))
-                data = await fetchbars(symbol, tf)
-                bot = ta(data, ta_table)
+                bot = ta(data, ta_table_data)
                 data = bot.indicator()
-                await asyncio.gather(feed(data, risk_manage))
+                await asyncio.gather(feed(data, risk_manage_data))
                 await asyncio.sleep(5)
                 print("Bot is running...")
             except Exception as e:
@@ -1381,12 +1283,11 @@ async def main():
 
 async def async_main():
     await asyncio.gather(main())
-    # await asyncio.gather(dailyreport())
 
 
 def run():
-    # while True:
-    asyncio.run(async_main())
+    while True:
+        asyncio.run(async_main())
 
 
 if __name__ == "__main__":

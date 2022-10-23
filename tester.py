@@ -6,7 +6,7 @@ import ccxt
 import pandas as pd
 import plotly.graph_objects as go
 
-from vxmapandasta import vxma as pa
+from appdata import risk_manage, ta_table
 from vxmatalib import benchmarking as ta_score
 from vxmatalib import vxma as ta
 
@@ -33,16 +33,16 @@ exchange = ccxt.binance()
 
 # get OHLC info
 
-ta_table = {
-    "atr_p": 12,
-    "atr_m": 1.6,
-    "ema": 30,
-    "linear": 30,
-    "smooth": 30,
-    "rsi": 14,
-    "aol": 30,
-    "pivot": 60,
-}
+# ta_table = {
+#     "atr_p": 12,
+#     "atr_m": 1.6,
+#     "ema": 30,
+#     "linear": 30,
+#     "smooth": 30,
+#     "rsi": 14,
+#     "aol": 30,
+#     "pivot": 60,
+# }
 
 
 def fetchbars(symbol, timeframe, exchange):
@@ -343,20 +343,21 @@ def plot(bot):
 
 
 # data = fetchbars("BTC/USDT", "1d", exchange)
-data = pd.read_csv("Bitcoin_1D_2009-2022.csv")
-data = data.set_index("Date")
+# data = pd.read_csv("Bitcoin_1D_2009-2022.csv")
+# data = data.set_index("Date")
 # t1 = time.time()
-bot = ta(data, ta_table)
-data = bot.indicator()
+# bot = ta(data, ta_table)
+# data = bot.indicator()
 # t2 = time.time()
 # print(f"TA-LIB Time used : {round(t2-t1,2)} Seconds")
 # t1 = time.time()
-bot2 = pa(data, ta_table)
-data2 = bot2.indicator()
-score = ta_score(data2)
-print(score.benchmarking())
+# bot2 = pa(data, ta_table)
+# data2 = bot2.indicator()
+# score = ta_score(data2)
+# print(score.benchmarking())
 # plot(bot)
 # t2 = time.time()
 # print(f"PANDAS TA Time used : {round(t2-t1,2)} Seconds")
-print(data.tail(2))
-print(data2.tail(2))
+# print(data.tail(2))
+# print(data2.tail(2))
+print(ta_table)
