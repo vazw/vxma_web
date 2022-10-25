@@ -1,0 +1,19 @@
+The Direction for this project is foggy as I'm a newbie to programming world
+but i have a dream I'm determined to make this a great project,
+I known I have alot to learn and still learning.
+
+If we have the same target let's learn,
+improve yourself and grow with this project!
+
+No more nonesense let see what we need to do
+-----------------------------------------------------------------------------
+25 Oct 2022
+1. we need to break ervery part to class method.
+2. remove duplicate part(eg. Market Order, TP, SL) to made it work on both direction 
+   without to implement it many times I think we can use dict method
+3. Cover Dash website with fastAPI module then we can use 0Auth+JWT for our safty
+4. Make trading record part
+5. Make Trading Summary page
+6. Make Backtesting Mode
+7. Make Custom Indicator Template that any one can work with us.
+-----------------------------------------------------------------------------

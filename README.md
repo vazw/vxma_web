@@ -35,4 +35,8 @@ password = 'vxmaBot'
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)
 
+### Need to help?
+1. read TODO files for our current workflow 
+2. any improvement or pointing some issues are welcome! 😁
+3. I need your help 🙏
 
