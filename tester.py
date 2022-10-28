@@ -3,12 +3,25 @@ import warnings
 from datetime import datetime as dt
 
 import ccxt
+import dash_bootstrap_components as dbc
+import dash_mantine_components as dmc
 import pandas as pd
 import plotly.graph_objects as go
+from dash import (
+    CeleryManager,
+    Dash,
+    DiskcacheManager,
+    dash_table,
+    dcc,
+    html,
+    register_page,
+)
+from dash.dependencies import Input, Output, State
+from dash.exceptions import PreventUpdate
 
-from appdata import risk_manage, ta_table
-from vxmatalib import benchmarking as ta_score
-from vxmatalib import vxma as ta
+from vxma_d.appData.appdata import risk_manage, ta_table
+from vxma_d.strategy.vxmatalib import benchmarking as ta_score
+from vxma_d.strategy.vxmatalib import vxma as ta
 
 warnings.filterwarnings("ignore")
 pd.set_option("display.max_rows", None)
@@ -342,22 +355,18 @@ def plot(bot):
     return fig.show()
 
 
-# data = fetchbars("BTC/USDT", "1d", exchange)
-# data = pd.read_csv("Bitcoin_1D_2009-2022.csv")
-# data = data.set_index("Date")
-# t1 = time.time()
-# bot = ta(data, ta_table)
-# data = bot.indicator()
-# t2 = time.time()
-# print(f"TA-LIB Time used : {round(t2-t1,2)} Seconds")
-# t1 = time.time()
-# bot2 = pa(data, ta_table)
-# data2 = bot2.indicator()
-# score = ta_score(data2)
-# print(score.benchmarking())
-# plot(bot)
-# t2 = time.time()
-# print(f"PANDAS TA Time used : {round(t2-t1,2)} Seconds")
-# print(data.tail(2))
-# print(data2.tail(2))
-print(ta_table)
+def menuInpput():
+    menuList = ["input1", "input2", "input3", "input4"]
+    input_result = []
+    for i in menuList:
+        input = dmc.NumberInput(
+            label=f"{i}",
+            id=f"{i}-input",
+            style={"width": 75},
+        )
+        input_result.append(input)
+    return input_result
+
+
+if __name__ == "__main__":
+    print(menuInpput())
