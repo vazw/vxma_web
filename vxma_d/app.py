@@ -11,9 +11,8 @@ import bcrypt
 import ccxt.async_support as ccxt
 import mplfinance as mplf
 import pandas as pd
-from line_notify import LineNotify
-
 from appdata import risk_manage, ta_table
+from line_notify import LineNotify
 from vxmatalib import benchmarking as ta_score
 from vxmatalib import vxma as ta
 
@@ -1285,10 +1284,6 @@ async def async_main():
     await asyncio.gather(main())
 
 
-def run():
+def run_bot():
     while True:
         asyncio.run(async_main())
-
-
-if __name__ == "__main__":
-    run()
