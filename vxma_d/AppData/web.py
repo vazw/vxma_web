@@ -30,7 +30,7 @@ from dash import (
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
-from vxma_d.AppData.appdata import bot_setting, config_setting, cooking, perf
+from vxma_d.AppData.Appdata import bot_setting, config_setting, cooking, perf
 from vxma_d.Strategy.vxmatalib import vxma as indi
 
 launch_uid = uuid4()

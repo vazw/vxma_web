@@ -19,13 +19,13 @@ import mplfinance as mplf
 import pandas as pd
 from line_notify import LineNotify
 
-from vxma_d.AppData.appdata import (
+from vxma_d.AppData.Appdata import (
     bot_setting,
     config_setting,
     risk_manage,
     ta_table,
 )
-from vxma_d.Strategy.vxmatalib import benchmarking as ta_score
+from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 from vxma_d.Strategy.vxmatalib import vxma as ta
 
 launch_uid = uuid4()
