@@ -1,20 +1,24 @@
 import asyncio
 import logging
 import os
-import sqlite3
 import time
 import warnings
 from datetime import datetime as dt
 from uuid import uuid4
 
-import bcrypt
 import ccxt.async_support as ccxt
 import mplfinance as mplf
 import pandas as pd
-from appdata import risk_manage, ta_table
 from line_notify import LineNotify
-from vxmatalib import benchmarking as ta_score
-from vxmatalib import vxma as ta
+
+from vxma_d.appData.appdata import (
+    bot_setting,
+    config_setting,
+    risk_manage,
+    ta_table,
+)
+from vxma_d.strategy.vxmatalib import benchmarking as ta_score
+from vxma_d.strategy.vxmatalib import vxma as ta
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -78,17 +82,6 @@ TIMEFRAMES_DICT = {
 }
 
 
-def bot_setting():
-    symbolist = pd.read_csv("bot_config.csv")
-    return symbolist
-
-
-def config_setting():
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
-        config = pd.read_sql("SELECT * FROM key", con=con)
-    return config
-
-
 def get_config():
     global BNBCZ, notify, min_balance, max_margin, MIN_BALANCE
     config = config_setting()
@@ -128,27 +121,6 @@ def get_config():
 
 
 get_config()
-
-
-def cooking(id, pwd):
-    pepper = f"{id}{pwd}!{barsC}vz{id}"
-    bytePwd = pepper.encode("utf-8")
-    Salt = bcrypt.gensalt(rounds=12)
-    cook = bcrypt.hashpw(bytePwd, Salt)
-    return cook
-
-
-def perf(id, pwd):
-    hash1 = "X"
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
-        bata = pd.read_sql("SELECT * FROM user", con=con)
-    iid = bata["id"][0]
-    if iid == id:
-        hash1 = bata["pass"][0]
-    egg = f"{id}{pwd}!{barsC}vz{id}"
-    bytePwd = egg.encode("utf-8")
-    proof = bcrypt.checkpw(bytePwd, hash1)
-    return proof
 
 
 def callbackRate(data):
@@ -1280,10 +1252,5 @@ async def main():
         print("Nothing to do now.....")
 
 
-async def async_main():
+async def run_bot():
     await asyncio.gather(main())
-
-
-def run_bot():
-    while True:
-        asyncio.run(async_main())

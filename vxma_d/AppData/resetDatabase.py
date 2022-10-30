@@ -130,23 +130,3 @@ def main():
 
 
 main()
-
-
-# def insert():
-#     try:
-#         id = ''
-#         hash1 = ''
-#         lis = [id,hash1]
-#         data = pd.DataFrame(columns=['id','pass'])
-#         data.loc[1] = lis
-#         data = data.set_index('id')
-#         print(data)
-#         data.to_sql('user', con=con, if_exists='replace', index=True)
-#         bata = pd.read_sql('SELECT * FROM user',con=con)
-#         print(bata)
-#         print('success')
-#     except sqlite3.Error as e:
-#         print(e)
-#         print('fail')
-
-# insert()

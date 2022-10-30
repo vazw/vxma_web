@@ -5,7 +5,6 @@ import time
 import warnings
 from uuid import uuid4
 
-import bcrypt
 import ccxt
 import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
@@ -23,7 +22,9 @@ from dash import (
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 from line_notify import LineNotify
-from vxmatalib import vxma as indi
+
+from vxma_d.appData.appdata import bot_setting, config_setting, cooking, perf
+from vxma_d.strategy.vxmatalib import vxma as indi
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -51,8 +52,8 @@ else:
         cache, cache_by=[lambda: launch_uid], expire=60
     )
 
-LINE_TOKEN = str(os.environ["Line_Notify_Token"])
-notify = LineNotify(LINE_TOKEN)
+# LINE_TOKEN = str(os.environ["Line_Notify_Token"])
+# notify = LineNotify(LINE_TOKEN)
 
 
 def clearconsol():
@@ -70,17 +71,6 @@ def clearconsol():
 logging.basicConfig(
     filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
 )
-
-
-def bot_setting():
-    symbolist = pd.read_csv("bot_config.csv")
-    return symbolist
-
-
-def config_setting():
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
-        config = pd.read_sql("SELECT * FROM key", con=con)
-    return config
 
 
 insession = dict(name=False, day=False, hour=False)
@@ -149,27 +139,6 @@ BOTCOL = [
     "Risk",
     "maxMargin",
 ]
-
-
-def cooking(id, pwd):
-    pepper = f"{id}{pwd}!{barsC}vz{id}"
-    bytePwd = pepper.encode("utf-8")
-    Salt = bcrypt.gensalt(rounds=12)
-    cook = bcrypt.hashpw(bytePwd, Salt)
-    return cook
-
-
-def perf(id, pwd):
-    hash1 = "X"
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
-        bata = pd.read_sql("SELECT * FROM user", con=con)
-    iid = bata["id"][0]
-    if iid == id:
-        hash1 = bata["pass"][0]
-    egg = f"{id}{pwd}!{barsC}vz{id}"
-    bytePwd = egg.encode("utf-8")
-    proof = bcrypt.checkpw(bytePwd, hash1)
-    return proof
 
 
 nomEX = ccxt.binance()
@@ -1530,7 +1499,7 @@ def excuteBot(
                     pd.Series(compo, index=BOTCOL), ignore_index=True
                 )
                 data.to_csv("bot_config.csv", index=False)
-                notify.send("Setting บอทเรียบร้อย บอทกำลังทำงาน!")
+                # notify.send("Setting บอทเรียบร้อย บอทกำลังทำงาน!")
                 return [
                     dbc.Alert(
                         "Success.",
@@ -1613,7 +1582,7 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
                         index_label="apikey",
                     )
                     con.commit()
-                notify.send("Setting API update")
+                # notify.send("Setting API update")
                 return [
                     dbc.Alert(
                         "Success.",
@@ -1678,7 +1647,7 @@ def resetpwd(click, pwd1, pwd2, id):
                         index_label="id",
                     )
                     con.commit()
-                notify.send("Setting รหัสผ่านสำเร็จ")
+                # notify.send("Setting รหัสผ่านสำเร็จ")
                 return [
                     dbc.Alert(
                         "Success.",

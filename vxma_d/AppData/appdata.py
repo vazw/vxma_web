@@ -1,4 +1,42 @@
+import sqlite3
 from dataclasses import dataclass
+
+import bcrypt
+import pandas as pd
+
+barsC = 1502
+
+
+def bot_setting():
+    symbolist = pd.read_csv("bot_config.csv")
+    return symbolist
+
+
+def config_setting():
+    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+        config = pd.read_sql("SELECT * FROM key", con=con)
+    return config
+
+
+def cooking(id, pwd):
+    pepper = f"{id}{pwd}!{barsC}vz{id}"
+    bytePwd = pepper.encode("utf-8")
+    Salt = bcrypt.gensalt(rounds=12)
+    cook = bcrypt.hashpw(bytePwd, Salt)
+    return cook
+
+
+def perf(id, pwd):
+    hash1 = "X"
+    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+        bata = pd.read_sql("SELECT * FROM user", con=con)
+    iid = bata["id"][0]
+    if iid == id:
+        hash1 = bata["pass"][0]
+    egg = f"{id}{pwd}!{barsC}vz{id}"
+    bytePwd = egg.encode("utf-8")
+    proof = bcrypt.checkpw(bytePwd, hash1)
+    return proof
 
 
 def max_margin_size(size, free_balance) -> float:
