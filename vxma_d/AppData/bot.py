@@ -1,3 +1,11 @@
+# The BEERWARE License (BEERWARE)
+#
+# Copyright (c) 2022 Author. All rights reserved.
+#
+# Licensed under the "THE BEER-WARE LICENSE" (Revision 42):
+# vazw wrote this file. As long as you retain this notice you
+# can do whatever you want with this stuff. If we meet some day, and you think
+# this stuff is worth it, you can buy me a beer or coffee in return
 import asyncio
 import logging
 import os
@@ -11,14 +19,14 @@ import mplfinance as mplf
 import pandas as pd
 from line_notify import LineNotify
 
-from vxma_d.appData.appdata import (
+from vxma_d.AppData.appdata import (
     bot_setting,
     config_setting,
     risk_manage,
     ta_table,
 )
-from vxma_d.strategy.vxmatalib import benchmarking as ta_score
-from vxma_d.strategy.vxmatalib import vxma as ta
+from vxma_d.Strategy.vxmatalib import benchmarking as ta_score
+from vxma_d.Strategy.vxmatalib import vxma as ta
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)

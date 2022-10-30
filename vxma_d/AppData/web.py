@@ -1,3 +1,11 @@
+# The BEERWARE License (BEERWARE)
+#
+# Copyright (c) 2022 Author. All rights reserved.
+#
+# Licensed under the "THE BEER-WARE LICENSE" (Revision 42):
+# vazw wrote this file. As long as you retain this notice you
+# can do whatever you want with this stuff. If we meet some day, and you think
+# this stuff is worth it, you can buy me a beer or coffee in return
 import logging
 import os
 import sqlite3
@@ -21,10 +29,9 @@ from dash import (
 )
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
-from line_notify import LineNotify
 
-from vxma_d.appData.appdata import bot_setting, config_setting, cooking, perf
-from vxma_d.strategy.vxmatalib import vxma as indi
+from vxma_d.AppData.appdata import bot_setting, config_setting, cooking, perf
+from vxma_d.Strategy.vxmatalib import vxma as indi
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -1089,7 +1096,9 @@ def logout(click):
     State("passw", "value"),
 )
 def update_output(n_clicks, uname, passw):
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+    with sqlite3.connect(
+        "vxma_d/AppData/vxma.db", check_same_thread=False
+    ) as con:
         config = pd.read_sql("SELECT * FROM user", con=con)
     li = config["id"][0]
     if uname == "" or uname is None or passw == "" or passw is None:
@@ -1562,7 +1571,9 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
         data = pd.DataFrame(
             columns=["freeB", "minB", "apikey", "apisec", "notify"]
         )
-        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+        with sqlite3.connect(
+            "vxma_d/AppData/vxma.db", check_same_thread=False
+        ) as con:
             config = pd.read_sql("SELECT * FROM user", con=con)
         id = config["id"][0]
         valit = True if perf(id, pwd) else False
@@ -1572,7 +1583,7 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
                 data.loc[1] = compo
                 data = data.set_index("apikey")
                 with sqlite3.connect(
-                    "vxma.db", check_same_thread=False
+                    "vxma_d/AppData/vxma.db", check_same_thread=False
                 ) as con:
                     data.to_sql(
                         "key",
@@ -1637,7 +1648,7 @@ def resetpwd(click, pwd1, pwd2, id):
             data = data.set_index("id")
             try:
                 with sqlite3.connect(
-                    "vxma.db", check_same_thread=False
+                    "vxma_d/AppData/vxma.db", check_same_thread=False
                 ) as con:
                     data.to_sql(
                         "user",
@@ -1727,7 +1738,7 @@ def edit_menu(click, rows, ready):
         if ready:
             try:
                 df = pd.DataFrame(rows, columns=BOTCOL)
-                df.to_csv("bot_config.csv", index=False)
+                df.to_csv("vxma_d/AppData/bot_config.csv", index=False)
                 return [
                     dbc.Alert(
                         "Success.",
