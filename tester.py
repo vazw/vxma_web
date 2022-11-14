@@ -8,7 +8,7 @@
 # this stuff is worth it, you can buy me a beer or coffee in return
 
 # def menuInpput():
-#     menuList = ["input1", "input2", "input3", "input4"]
+#     menuList = ["input1", "input2", "input3", "input4"]:
 #     input_result = []
 #     for i in menuList:
 #         input = dmc.NumberInput(
@@ -18,23 +18,17 @@
 #         )
 #         input_result.append(input)
 #     return input_result
+import asyncio
 
-import sqlite3
-
-import pandas as pd
-
-
-def bot_setting():
-    symbolist = pd.read_csv("appData/bot_config.csv")
-    return symbolist
+from vxma_d.AppData.Candle_ohlc import Download_Candle
 
 
-def config_setting():
-    with sqlite3.connect("appData/vxma.db", check_same_thread=False) as con:
-        config = pd.read_sql("SELECT * FROM key", con=con)
-    return config
+async def main():
+    bot = Download_Candle("BTC/USDT", "1d")
+    df = await bot.fetching_candle()
+    print(df.tail())
+    # print(await bot.fetching_candle())
 
 
 if __name__ == "__main__":
-    print(config_setting())
-    print(bot_setting())
+    asyncio.run(main())

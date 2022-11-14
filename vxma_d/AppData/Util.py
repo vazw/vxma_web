@@ -6,7 +6,7 @@
 # vazw wrote this file. As long as you retain this notice you
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer or coffee in return
-import math as mt
+import math
 import warnings
 
 import numpy as np
@@ -90,20 +90,18 @@ def andean(close, open, aol_ip, m):
             )
             # up1[i-1] := nz(math.max(C, O, up1[1] - (up1[1] - C) * alpha), C)
             up11 = up1[i] = up11 if up11 is not np.nan else Close[i]
-<<<<<<< HEAD
             # up2[i-1] := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C)
             # * alpha), C * C)
-=======
-            # up2[i-1] := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C) * alpha), C * C)
->>>>>>> 24843e5d06e8500a987441d5cc6f4e95d0a2083f
+            # up2[i-1] := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C)
+            # * alpha), C * C)
             up22 = up2[i] = up22 if up22 is not np.nan else Close[i] * Close[i]
             # dn1[i-1] := nz(math.min(C, O, dn1[1] + (C - dn1[1]) * alpha), C)
             dn11 = dn1[i] = dn11 if dn11 is not np.nan else Close[i]
             # dn2[i-1] := nz(math.min(C * C, O * O, dn2[1] + (C * C - dn2[1])
             # * alpha), C * C)
             dn22 = dn2[i] = dn22 if dn22 is not np.nan else Close[i] * Close[i]
-            cBull[i] = mt.sqrt(dn22 - (dn11 * dn11))
-            cBear[i] = mt.sqrt(up22 - (up11 * up11))
+            cBull[i] = math.sqrt(dn22 - (dn11 * dn11))
+            cBear[i] = math.sqrt(up22 - (up11 * up11))
         return cBull, cBear
     except Exception as e:
         print(f"Andean Oscillator is error : {e}")

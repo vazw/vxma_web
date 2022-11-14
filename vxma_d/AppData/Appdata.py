@@ -7,14 +7,40 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer or coffee in return
 
-
+import asyncio
+import os
 import sqlite3
 from dataclasses import dataclass
 
 import bcrypt
+import mplfinance as mplf
 import pandas as pd
+from line_notify import LineNotify
 
 barsC = 1502
+
+rcs = {
+    "axes.labelcolor": "none",
+    "axes.spines.left": False,
+    "axes.spines.right": False,
+    "axes.axisbelow": False,
+    "axes.grid": True,
+    "grid.linestyle": ":",
+    "axes.titlesize": "xx-large",
+    "axes.titleweight": "bold",
+}
+
+
+color = mplf.make_marketcolors(
+    up="white", down="black", wick="black", edge="black"
+)
+s = mplf.make_mpf_style(
+    rc=rcs,
+    y_on_right=True,
+    marketcolors=color,
+    figcolor="white",
+    gridaxis="horizontal",
+)
 
 
 def bot_setting():
@@ -67,7 +93,7 @@ def max_margin_size(size, free_balance) -> float:
         return Max_Size
 
 
-class risk_manage:
+class RiskManageTable:
     def __init__(self, symbolist, free_balance):
         self.symbol = symbolist["symbol"][0]
         if self.symbol[0:4] == "1000":
@@ -94,7 +120,7 @@ class risk_manage:
 
 
 @dataclass
-class ta_table:
+class TATable:
     atr_p: int = 12
     atr_m: float = 1.6
     ema: int = 30
@@ -103,3 +129,115 @@ class ta_table:
     rsi: int = 25
     aol: int = 30
     pivot: int = 60
+
+
+def callbackRate(data):
+    m = len(data.index)
+    try:
+        highest = data["highest"][m - 1]
+        lowest = data["lowest"][m - 1]
+        rate = round((highest - lowest) / highest * 100, 1)
+        if rate > 5:
+            rate = 5
+        elif rate < 0.1:
+            rate = 0.1
+        return rate
+    except Exception as e:
+        print(f"callbackRate is error : {e}")
+        return 2.5
+
+
+class AppConfig:
+    """Get config for global App."""
+
+    def __init__(self):
+        config = config_setting()
+        max_margin = "$10"
+        MIN_BALANCE = "$50"
+        if not config.empty:
+            max_margin = str(config["freeB"][0])
+            MIN_BALANCE = str(config["minB"][0])
+            API_KEY = str(config["apikey"][0])
+            API_SECRET = str(config["apisec"][0])
+            LINE_TOKEN = str(config["notify"][0])
+        else:
+            API_KEY = ""
+            API_SECRET = ""
+            LINE_TOKEN = ""
+        if "API_KEY" in os.environ:
+            API_KEY = str(os.environ["API_KEY"])
+            API_SECRET = str(os.environ["API_SECRET"])
+            LINE_TOKEN = str(os.environ["Line_Notify_Token"])
+        if MIN_BALANCE[0] == "$":
+            self.min_balance = float(MIN_BALANCE[1 : len(MIN_BALANCE)])
+        else:
+            self.min_balance = float(MIN_BALANCE)
+        if max_margin[0] == "$":
+            self.max_margin = float(max_margin[1 : len(max_margin)])
+        else:
+            self.max_margin = float(max_margin)
+        self.notify_token = LINE_TOKEN
+        self.BNBCZ = {
+            "apiKey": API_KEY,
+            "secret": API_SECRET,
+            "options": {"defaultType": "future"},
+            "enableRateLimit": True,
+            "adjustForTimeDifference": True,
+        }
+
+
+def notify_send(msg, sticker=None, package=None):
+    notify = LineNotify(AppConfig.BNBCZ)
+    if sticker is None:
+        notify.send(msg)
+    else:
+        notify.send(
+            msg,
+            sticker_id=sticker,
+            package_id=package,
+        )
+
+
+def candle(df, symbol, tf):
+    data = df.tail(60)
+    titles = f"{symbol}_{tf}"
+    try:
+        vxma = mplf.make_addplot(
+            data.vxma, secondary_y=False, color="blue", linewidths=0.2
+        )
+        buy = mplf.make_addplot(
+            data.buyPrice, secondary_y=False, color="green", scatter=True
+        )
+        sell = mplf.make_addplot(
+            data.sellPrice, secondary_y=False, color="red", scatter=True
+        )
+        mplf.plot(
+            data,
+            type="candle",
+            title=titles,
+            addplot=[vxma, buy, sell],
+            style=s,
+            volume=True,
+            savefig="candle.png",
+            tight_layout=True,
+            figratio=(9, 9),
+            datetime_format="%y/%b/%d %H:%M",
+            xrotation=20,
+        )
+    except Exception as e:
+        print(f"{e}")
+        mplf.plot(
+            data,
+            type="candle",
+            title=titles,
+            style=s,
+            volume=True,
+            savefig="candle.png",
+            tight_layout=True,
+            figratio=(9, 9),
+            datetime_format="%y/%b/%d %H:%M",
+            xrotation=20,
+        )
+    notify_send(f"info : {titles}", image_path=("./candle.png"))
+    asyncio.sleep(0.5)
+    return

@@ -28,6 +28,13 @@ class Download_Candle:
         self.symbol = symbol
         self.timeframe = timeframe
 
-    def fetching_candle(self):
+    async def fetching_candle(self):
         exchange = ccxt.binance()
-        bars = exchange.fetch_ohlcv(self.symbol, asyncio.self.timeframe)
+        bars = await exchange.fetch_ohlcv(self.symbol, self.timeframe)
+        df = pd.DataFrame(
+            bars,
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
+        )
+        await exchange.close()
+
+        return df
