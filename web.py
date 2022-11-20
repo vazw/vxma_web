@@ -1769,7 +1769,7 @@ def edit_menu(click, rows, ready):
                 )
             ]
     else:
-        return [
+        [
             dbc.Alert(
                 "Ops! Something went wrong, Please retry.",
                 dismissable=True,
@@ -1778,3 +1778,7 @@ def edit_menu(click, rows, ready):
                 color="danger",
             )
         ]
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
