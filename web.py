@@ -1769,7 +1769,7 @@ def edit_menu(click, rows, ready):
                 )
             ]
     else:
-        [
+        return [
             dbc.Alert(
                 "Ops! Something went wrong, Please retry.",
                 dismissable=True,
