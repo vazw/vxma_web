@@ -27,7 +27,6 @@ from vxma_d.MarketEX.CCXT_Binance import (
     disconnect,
     feed,
     fetchbars,
-    get_config,
     get_symbol,
 )
 from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
@@ -413,7 +412,7 @@ async def main():
                 data = await fetchbars(
                     risk_manage_data.symbol, risk_manage_data.timeframe
                 )
-                bot = ta(data, ta_table_data)
+                bot = ta(data, ta_table_data.__dict__)
                 data = bot.indicator()
                 await asyncio.gather(feed(data, risk_manage_data))
                 await asyncio.sleep(5)
