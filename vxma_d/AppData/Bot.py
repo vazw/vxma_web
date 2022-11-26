@@ -94,9 +94,6 @@ TIMEFRAMES_DICT = {
 }
 
 
-get_config()
-
-
 color = mplf.make_marketcolors(
     up="white", down="black", wick="black", edge="black"
 )
@@ -366,7 +363,6 @@ async def dailyreport():
 
 async def main():
     symbolist = bot_setting()
-    get_config()
     seconds = time.time()
     local_time = time.ctime(seconds)
     if str(local_time[14:-9]) == "1":

@@ -9,12 +9,12 @@
 
 import asyncio
 
-from vxma_d.AppData import bot
+from vxma_d.AppData import Bot
 
 
 def main():
     while True:
-        asyncio.run(bot.run_bot())
+        asyncio.run(Bot.run_bot())
 
 
 if __name__ == "__main__":
