@@ -31,6 +31,7 @@ from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
 from vxma_d.AppData.Appdata import bot_setting, config_setting, cooking, perf
+from vxma_d.Strategy.ematalib import EMA_CROSS as EMA
 from vxma_d.Strategy.vxmatalib import vxma as indi
 
 launch_uid = uuid4()
@@ -1336,7 +1337,7 @@ def update_EMA_chart(
         lambda x: x.tz_convert("Asia/Bangkok")
     )
     df = df.set_index("timestamp")
-    df = sEMA(df, emafast, emaslow)
+    df = EMA(df, emafast, emaslow)
     data = df.tail(num_bars)
     fig = go.Figure(
         data=go.Candlestick(
@@ -1352,7 +1353,7 @@ def update_EMA_chart(
     )
     ema1 = go.Scatter(
         x=data.index,
-        y=data["emafast"],
+        y=data["EMA_FAST"],
         mode="lines",
         line=go.scatter.Line(color="blue"),
         showlegend=True,
@@ -1360,7 +1361,7 @@ def update_EMA_chart(
     )
     ema2 = go.Scatter(
         x=data.index,
-        y=data["emaslow"],
+        y=data["EMA_SLOW"],
         mode="lines",
         line=go.scatter.Line(color="yellow"),
         showlegend=True,

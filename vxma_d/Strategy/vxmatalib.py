@@ -1,6 +1,6 @@
 # The BEERWARE License (BEERWARE)
 #
-# Copyright (c) 2022 Author. All rights reserved.
+# Copyright (c) 2022 vazw. All rights reserved.
 #
 # Licensed under the "THE BEER-WARE LICENSE" (Revision 42):
 # vazw wrote this file. As long as you retain this notice you
