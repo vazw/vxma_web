@@ -254,9 +254,9 @@ async def get_dailytasks():
     for symbol in symbolist:
         try:
             df1, df2, df3 = await asyncio.gather(
-                bot_1(symbol, ta_data, "1d"),
-                bot_2(symbol, ta_data, "6h"),
-                bot_3(symbol, ta_data, "1h"),
+                bot_1(symbol, ta_data.__dict__, "1d"),
+                bot_2(symbol, ta_data.__dict__, "6h"),
+                bot_3(symbol, ta_data.__dict__, "1h"),
             )
 
             candle(df1, symbol, "1d")
@@ -361,7 +361,7 @@ async def dailyreport():
         return
 
 
-async def main():
+async def running_module():
     symbolist = bot_setting()
     seconds = time.time()
     local_time = time.ctime(seconds)
@@ -389,38 +389,43 @@ async def main():
             msg = f"Total Balance : {total} USDT"
             notify_send(msg, sticker_id=10863, package_id=789)
             insession["hour"] = True
-        exchange.precisionMode = ccxt.DECIMAL_PLACES
         free_balance = float(balance["free"]["USDT"])
         await disconnect(exchange)
-        for i in range(len(symbolist.index)):
-            try:
-                ta_table_data = TATable(
-                    symbolist["ATR"][i],
-                    symbolist["ATR_m"][i],
-                    symbolist["EMA"][i],
-                    symbolist["subhag"][i],
-                    symbolist["smooth"][i],
-                    symbolist["RSI"][i],
-                    symbolist["Andean"][i],
-                    symbolist["Pivot"][i],
+        for i in symbolist.index:
+
+            # try:
+            ta_table_data = TATable(
+                atr_p=symbolist["ATR"][i],
+                atr_m=symbolist["ATR_m"][i],
+                ema=symbolist["EMA"][i],
+                linear=symbolist["subhag"][i],
+                smooth=symbolist["smooth"][i],
+                rsi=symbolist["RSI"][i],
+                aol=symbolist["Andean"][i],
+                pivot=symbolist["Pivot"][i],
+            )
+            risk_manage_data = await RiskManageTable(
+                symbolist[i], free_balance
+            )
+            print(risk_manage_data)
+            data = await asyncio.gather(
+                bot_1(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.timeframe,
                 )
-                risk_manage_data = RiskManageTable(symbolist[i], free_balance)
-                data = await fetchbars(
-                    risk_manage_data.symbol, risk_manage_data.timeframe
-                )
-                bot = ta(data, ta_table_data.__dict__)
-                data = bot.indicator()
-                await asyncio.gather(feed(data, risk_manage_data))
-                await asyncio.sleep(5)
-                print("Bot is running...")
-            except Exception as e:
-                print(e)
-                pass
-        await asyncio.sleep(30)
+            )
+            await asyncio.gather(feed(data, risk_manage_data))
+            await asyncio.sleep(1)
+            print("Bot is running...")
+            # except Exception as e:
+            #     print(e)
+            #     pass
+        await asyncio.sleep(1)
     else:
-        await asyncio.sleep(59)
+        await asyncio.sleep(1)
         print("Nothing to do now.....")
 
 
 async def run_bot():
-    await asyncio.gather(main())
+    await asyncio.gather(running_module())

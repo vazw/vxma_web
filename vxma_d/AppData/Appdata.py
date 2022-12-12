@@ -94,17 +94,17 @@ def max_margin_size(size, free_balance) -> float:
 
 
 class RiskManageTable:
-    def __init__(self, symbolist, free_balance):
+    async def __init__(self, symbolist, free_balance):
         self.symbol = symbolist["symbol"][0]
         if self.symbol[0:4] == "1000":
             self.symbol = self.symbol[4 : len(self.symbol)]
         self.timeframe = symbolist["timeframe"][0]
-        self.use_long = self.check_bool(symbolist["Uselong"][0])
-        self.use_short = self.check_bool(symbolist["Useshort"][0])
-        self.use_tp_1 = self.check_bool(symbolist["UseTP1"][0])
-        self.use_tp_2 = self.check_bool(symbolist["UseTP2"][0])
-        self.use_sl = self.check_bool(symbolist["UseSL"][0])
-        self.use_tailing = self.check_bool(symbolist["Tail_SL"])
+        self.use_long = await self.check_bool(symbolist["Uselong"][0])
+        self.use_short = await self.check_bool(symbolist["Useshort"][0])
+        self.use_tp_1 = await self.check_bool(symbolist["UseTP1"][0])
+        self.use_tp_2 = await self.check_bool(symbolist["UseTP2"][0])
+        self.use_sl = await self.check_bool(symbolist["UseSL"][0])
+        self.use_tailing = await self.check_bool(symbolist["Tail_SL"])
         self.max_size = max_margin_size(
             str(symbolist["Max_Size"][0]), free_balance
         )
@@ -115,7 +115,7 @@ class RiskManageTable:
         self.risk_reward_2 = symbolist["RR2"][0]
         self.leverage = symbolist["leverage"][0]
 
-    def check_bool(self, arg):
+    async def check_bool(self, arg):
         return True if str(arg).lower() == "true" else False
 
 
@@ -186,16 +186,19 @@ class AppConfig:
         }
 
 
-def notify_send(msg, sticker=None, package=None):
-    notify = LineNotify(AppConfig.BNBCZ)
-    if sticker is None:
-        notify.send(msg)
-    else:
+def notify_send(msg, sticker=None, package=None, image_path=None):
+    config = AppConfig()
+    notify = LineNotify(config.notify_token)
+    if image_path is not None:
+        notify.send(message=msg, image_path=image_path)
+    elif sticker is not None:
         notify.send(
             msg,
             sticker_id=sticker,
             package_id=package,
         )
+    else:
+        notify.send(msg)
 
 
 def candle(df, symbol, tf):
