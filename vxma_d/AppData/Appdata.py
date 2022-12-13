@@ -71,14 +71,12 @@ BOTCOL = [
 
 
 def bot_setting():
-    symbolist = pd.read_csv("vxma_d/AppData/bot_config.csv")
+    symbolist = pd.read_csv("bot_config.csv")
     return symbolist
 
 
 def config_setting():
-    with sqlite3.connect(
-        "vxma_d/AppData/vxma.db", check_same_thread=False
-    ) as con:
+    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
         config = pd.read_sql("SELECT * FROM key", con=con)
     return config
 
@@ -93,9 +91,7 @@ def cooking(id, pwd):
 
 def perf(id, pwd):
     hash1 = "X"
-    with sqlite3.connect(
-        "vxma_d/AppData/vxma.db", check_same_thread=False
-    ) as con:
+    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
         bata = pd.read_sql("SELECT * FROM user", con=con)
     iid = bata["id"][0]
     if iid == id:

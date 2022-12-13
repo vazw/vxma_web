@@ -1071,9 +1071,7 @@ def logout(click):
     State("passw", "value"),
 )
 def update_output(n_clicks, uname, passw):
-    with sqlite3.connect(
-        "vxma_d/AppData/vxma.db", check_same_thread=False
-    ) as con:
+    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
         config = pd.read_sql("SELECT * FROM user", con=con)
     li = config["id"][0]
     if uname == "" or uname is None or passw == "" or passw is None:
@@ -1478,11 +1476,11 @@ def excuteBot(
                 maxMargin,
             ]
             try:
-                data = pd.read_csv("vxma_d/AppData/bot_config.csv")
+                data = pd.read_csv("bot_config.csv")
                 data = data.append(
                     pd.Series(compo, index=BOTCOL), ignore_index=True
                 )
-                data.to_csv("vxma_d/AppData/bot_config.csv", index=False)
+                data.to_csv("bot_config.csv", index=False)
                 # notify.send("Setting บอทเรียบร้อย บอทกำลังทำงาน!")
                 return [
                     dbc.Alert(
@@ -1546,9 +1544,7 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
         data = pd.DataFrame(
             columns=["freeB", "minB", "apikey", "apisec", "notify"]
         )
-        with sqlite3.connect(
-            "vxma_d/AppData/vxma.db", check_same_thread=False
-        ) as con:
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
             config = pd.read_sql("SELECT * FROM user", con=con)
         id = config["id"][0]
         valit = True if perf(id, pwd) else False
@@ -1558,7 +1554,7 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
                 data.loc[1] = compo
                 data = data.set_index("apikey")
                 with sqlite3.connect(
-                    "vxma_d/AppData/vxma.db", check_same_thread=False
+                    "vxma.db", check_same_thread=False
                 ) as con:
                     data.to_sql(
                         "key",
@@ -1623,7 +1619,7 @@ def resetpwd(click, pwd1, pwd2, id):
             data = data.set_index("id")
             try:
                 with sqlite3.connect(
-                    "vxma_d/AppData/vxma.db", check_same_thread=False
+                    "vxma.db", check_same_thread=False
                 ) as con:
                     data.to_sql(
                         "user",
@@ -1713,7 +1709,7 @@ def edit_menu(click, rows, ready):
         if ready:
             try:
                 df = pd.DataFrame(rows, columns=BOTCOL)
-                df.to_csv("vxma_d/AppData/bot_config.csv", index=False)
+                df.to_csv("bot_config.csv", index=False)
                 return [
                     dbc.Alert(
                         "Success.",

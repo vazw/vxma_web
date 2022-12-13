@@ -304,12 +304,12 @@ async def running_module():
                     risk_manage_data.timeframe,
                 )
                 await asyncio.gather(feed(data, risk_manage_data.__dict__))
-                print("Bot is running...")
 
             except Exception as e:
                 print(e)
                 pass
         await asyncio.sleep(1)
+        print("Bot is running...")
     else:
         await asyncio.sleep(60)
         print("Nothing to do now.....")
@@ -317,4 +317,5 @@ async def running_module():
 
 async def run_bot():
     await asyncio.gather(running_module())
+    await asyncio.sleep(30)
     # await asyncio.gather(dailyreport())
