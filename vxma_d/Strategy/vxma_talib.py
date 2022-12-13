@@ -1,31 +1,11 @@
-# The BEERWARE License (BEERWARE)
-#
-# Copyright (c) 2022 vazw. All rights reserved.
-#
-# Licensed under the "THE BEER-WARE LICENSE" (Revision 42):
-# vazw wrote this file. As long as you retain this notice you
-# can do whatever you want with this stuff. If we meet some day, and you think
-# this stuff is worth it, you can buy me a beer or coffee in return
 import math
 import warnings
 
 import numpy as np
 import pandas as pd
-from talib import (
-    ADX,
-    EMA,
-    LINEARREG,
-    MACD,
-    MAX,
-    MIN,
-    MINUS_DI,
-    PLUS_DI,
-    RSI,
-    SMA,
-    TRANGE,
-)
+from talib import EMA, LINEARREG, MAX, MIN, RSI, SMA, TRANGE
 
-# __author__ = "Vax, Jakkaphat"
+# __author__ = "Vaz, Jakkaphat"
 # __email__ = "4wonzest@gmail.com"
 
 

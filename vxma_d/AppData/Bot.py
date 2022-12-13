@@ -30,7 +30,11 @@ from vxma_d.MarketEX.CCXT_Binance import (
     get_symbol,
 )
 from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
-from vxma_d.Strategy.vxmatalib import vxma as ta
+
+try:
+    from vxma_d.Strategy.vxma_talib import vxma as ta
+except Exception as e:
+    from vxma_d.Strategy.vxma_pandas_ta import vxma as ta
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)

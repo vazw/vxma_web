@@ -1,31 +1,11 @@
-# The BEERWARE License (BEERWARE)
-#
-# Copyright (c) 2022 vazw. All rights reserved.
-#
-# Licensed under the "THE BEER-WARE LICENSE" (Revision 42):
-# vazw wrote this file. As long as you retain this notice you
-# can do whatever you want with this stuff. If we meet some day, and you think
-# this stuff is worth it, you can buy me a beer or coffee in return
 import math
 import warnings
 
 import numpy as np
 import pandas as pd
-from talib import (
-    ADX,
-    EMA,
-    LINEARREG,
-    MACD,
-    MAX,
-    MIN,
-    MINUS_DI,
-    PLUS_DI,
-    RSI,
-    SMA,
-    TRANGE,
-)
+import pandas_ta as ta
 
-# __author__ = "Vax, Jakkaphat"
+# __author__ = "Vaz, Jakkaphat"
 # __email__ = "4wonzest@gmail.com"
 
 
@@ -100,11 +80,25 @@ class vxma:
 
     def swing_low(self):
         """calculate swing low price with given data"""
-        return MIN(self.low, self.pivot)
+        df = self.data
+        lowest = df["low"]
+        for i in range(self.length - self.pivot, self.length):
+            if df["low"][i] < lowest[i - 1]:
+                lowest[i] = df["low"][i]
+            else:
+                lowest[i] = lowest[i - 1]
+        return lowest
 
     def swing_high(self):
         """calculate swing high price with given data"""
-        return MAX(self.high, self.pivot)
+        df = self.data
+        highest = df["high"]
+        for i in range(self.length - self.pivot, self.length):
+            if df["high"][i] > highest[i - 1]:
+                highest[i] = df["high"][i]
+            else:
+                highest[i] = highest[i - 1]
+        return highest
 
     def andean(self):
         """calculate Andean Oscillator.
@@ -165,8 +159,8 @@ class vxma:
         alpha = pd.Series(np.full(self.length, np.nan), index=Close.index)
         High = self.high
         Low = self.low
-        atr = SMA(TRANGE(High, Low, Close), self.atr)
-        rsi = RSI(Close, self.rsi)
+        atr = ta.sma(ta.true_range(High, Low, Close), self.atr)
+        rsi = ta.rsi(Close, self.rsi)
         dnT = High + (atr * self.atrm)
         upT = Low - (atr * self.atrm)
         for i in range(1, self.length):
@@ -189,8 +183,10 @@ class vxma:
         vxma = pd.Series(np.full(self.length, np.nan), index=self.data.index)
         Close = pd.Series(self.close, dtype=np.float64)
         component = pd.DataFrame(columns=["ema", "linear", "alpha"])
-        component["ema"] = EMA(Close, self.ema)
-        component["linear"] = EMA(LINEARREG(Close, self.subhag), self.smooth)
+        component["ema"] = ta.ema(Close, self.ema)
+        component["linear"] = ta.ema(
+            ta.linreg(Close, self.subhag), self.smooth
+        )
         component["alpha"] = self.alPhaT()
         cBull, cBear = self.andean()
         clohi = component.max(axis=1)
