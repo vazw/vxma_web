@@ -310,5 +310,5 @@ async def running_module():
 
 
 async def run_bot():
-    # await asyncio.gather(running_module())
-    await asyncio.gather(dailyreport())
+    await asyncio.gather(running_module())
+    # await asyncio.gather(dailyreport())
