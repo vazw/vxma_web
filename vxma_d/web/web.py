@@ -39,6 +39,7 @@ except Exception as e:
     print(e)
     from vxma_d.Strategy.vxma_pandas_ta import vxma as indi
 
+
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
 warnings.filterwarnings("ignore")
@@ -1754,7 +1755,3 @@ def edit_menu(click, rows, ready):
                 color="danger",
             )
         ]
-
-
-if __name__ == "__main__":
-    app.run(debug=True)

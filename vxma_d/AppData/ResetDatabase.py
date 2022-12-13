@@ -11,9 +11,6 @@ import sqlite3
 import bcrypt
 import pandas as pd
 
-con = sqlite3.connect("vxma.db")
-cur = con.cursor()
-
 barsC = 1502
 pwd = "vxmaBot"
 id = "vxma"
@@ -28,7 +25,7 @@ def cooking(id, pwd):
 
 dropuser = "DROP TABLE user"
 dropkey = "DROP TABLE key"
-dropbot = "DROP TABLE Bot"
+# dropbot = "DROP TABLE Bot"
 
 # 2
 sql_create_users = """CREATE TABLE IF NOT EXISTS user (
@@ -73,8 +70,10 @@ sql_create_tasks_table = """CREATE TABLE IF NOT EXISTS Bot (
 
 def cUser():
     try:
-        cur.execute(sql_create_users)
-        con.commit()
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            cur = con.cursor()
+            cur.execute(sql_create_users)
+            con.commit()
         print("success : user")
     except sqlite3.Error as e:
         print(e)
@@ -83,8 +82,10 @@ def cUser():
 
 def cKey():
     try:
-        cur.execute(sql_create_key)
-        con.commit()
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            cur = con.cursor()
+            cur.execute(sql_create_key)
+            con.commit()
         print("success : key")
     except sqlite3.Error as e:
         print(e)
@@ -93,9 +94,11 @@ def cKey():
 
 def cBot():
     try:
-        cur.execute(sql_create_tasks_table)
-        con.commit()
-        print("success : Bot")
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            cur = con.cursor()
+            cur.execute(sql_create_tasks_table)
+            con.commit()
+            print("success : Bot")
     except sqlite3.Error as e:
         print(e)
         print("Fail to create table : Bot")
@@ -103,15 +106,20 @@ def cBot():
 
 def newUser():
     try:
-        data = pd.DataFrame(columns=["id", "pass"])
-        cook = cooking(id, pwd)
-        compo = [id, cook]
-        data.loc[1] = compo
-        data = data.set_index("id")
-        data.to_sql(
-            "user", con=con, if_exists="replace", index=True, index_label="id"
-        )
-        print("success : RESET")
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            data = pd.DataFrame(columns=["id", "pass"])
+            cook = cooking(id, pwd)
+            compo = [id, cook]
+            data.loc[1] = compo
+            data = data.set_index("id")
+            data.to_sql(
+                "user",
+                con=con,
+                if_exists="replace",
+                index=True,
+                index_label="id",
+            )
+            print("success : RESET")
     except sqlite3.Error as e:
         print(e)
         print("fail")
@@ -119,22 +127,21 @@ def newUser():
 
 def dropT():
     try:
-        cur.execute(dropuser)
-        cur.execute(dropkey)
-        cur.execute(dropbot)
-        con.commit()
-        print("success : Drop")
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            cur = con.cursor()
+            cur.execute(dropuser)
+            cur.execute(dropkey)
+            # cur.execute(dropbot)
+            con.commit()
+            print("success : Drop")
     except sqlite3.Error as e:
         print(e)
         print("Fail to drop table!")
 
 
-def main():
+def resetdata():
     dropT()
     cUser()
     cKey()
     newUser()
     # cBot()
-
-
-main()
