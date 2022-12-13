@@ -5,14 +5,46 @@ from datetime import datetime as dt
 import ccxt.async_support as ccxt
 import pandas as pd
 
-from vxma_d.AppData.Appdata import (
-    AppConfig,
-    bot_setting,
-    callbackRate,
-    notify_send,
-)
+from vxma_d.AppData.Appdata import AppConfig, bot_setting, candle, notify_send
 
 barsC = 1502
+
+
+def callbackRate(data):
+    m = len(data.index)
+    try:
+        highest = data["highest"][m - 1]
+        lowest = data["lowest"][m - 1]
+        rate = round((highest - lowest) / highest * 100, 1)
+        if rate > 5:
+            rate = 5
+        elif rate < 0.1:
+            rate = 0.1
+        return float(rate)
+    except Exception as e:
+        print(f"callbackRate is error : {e}")
+        return 2.5
+
+
+# TP with Risk:Reward
+def RRTP(df, direction, step, price, TPRR1, TPRR2):
+    m = len(df.index)
+    if direction:
+        low = float(df["Lowest"][m - 1])
+        if step == 1:
+            target = price * (1 + ((price - low) / price) * float(TPRR1))
+            return float(target)
+        if step == 2:
+            target = price * (1 + ((price - low) / price) * float(TPRR2))
+            return float(target)
+    else:
+        high = float(df["Highest"][m - 1])
+        if step == 1:
+            target = price * (1 - ((high - price) / price) * float(TPRR1))
+            return float(target)
+        if step == 2:
+            target = price * (1 - ((high - price) / price) * float(TPRR2))
+            return float(target)
 
 
 async def connect():
@@ -35,7 +67,7 @@ async def get_symbol():
     except Exception as e:
         print(e)
         await disconnect(exchange)
-        await asyncio.sleep(10)
+
         logging.info(e)
         exchange = await connect()
         market = await exchange.fetch_tickers(params={"type": "future"})
@@ -77,7 +109,7 @@ async def fetchbars(symbol, timeframe):
     except Exception as e:
         print(e)
         await disconnect(exchange)
-        await asyncio.sleep(10)
+
         logging.info(e)
         exchange = await connect()
         bars = await exchange.fetch_ohlcv(
@@ -102,7 +134,7 @@ async def setleverage(symbol, lev, exchange):
     except Exception as e:
         print(e)
         await disconnect(exchange)
-        await asyncio.sleep(10)
+
         logging.info(e)
         exchange = await connect()
     lever = await exchange.fetch_positions_risk([symbol])
@@ -154,7 +186,7 @@ async def USESLSHORT(
                     amount,
                     params={
                         "activationPrice": float(RR1(df, False, bid)),
-                        "callbackRate": float(callbackRate(df)),
+                        "callbackRate": callbackRate(df),
                         "positionSide": Sside,
                     },
                 )
@@ -181,7 +213,7 @@ async def USESLSHORT(
                     amount,
                     params={
                         "activationPrice": float(RR1(df, False, bid)),
-                        "callbackRate": float(callbackRate(df)),
+                        "callbackRate": callbackRate(df),
                         "reduceOnly": True,
                         "positionSide": Sside,
                     },
@@ -315,47 +347,81 @@ async def USETPLONG(
     return
 
 
+# Position Sizing
+def buysize(df, balance, symbol, exchange, RISK):
+    last = len(df.index) - 1
+    freeusd = float(balance["free"]["USDT"])
+    low = float(df["Lowest"][last])
+    if RISK[0] == "$":
+        risk = float(RISK[1 : len(RISK)])
+    elif RISK[0] == "%":
+        percent = float(RISK)
+        risk = (percent / 100) * freeusd
+    else:
+        risk = float(RISK)
+    amount = abs(risk / (df["close"][last] - low))
+    qty_precision = exchange.amount_to_precision(symbol, amount)
+    lot = qty_precision
+    return float(lot)
+
+
+def sellsize(df, balance, symbol, exchange, RISK):
+    last = len(df.index) - 1
+    freeusd = float(balance["free"]["USDT"])
+    high = float(df["Highest"][last])
+    if RISK[0] == "$":
+        risk = float(RISK[1 : len(RISK)])
+    elif RISK[0] == "%":
+        percent = float(RISK)
+        risk = (percent / 100) * freeusd
+    else:
+        risk = float(RISK)
+    amount = abs(risk / (high - df["close"][last]))
+    qty_precision = exchange.amount_to_precision(symbol, amount)
+    lot = qty_precision
+    return float(lot)
+
+
 # OpenLong=Buy
-async def OpenLong(
-    df,
-    balance,
-    risk_manage,
-    exchange,
-    currentMODE,
-    Lside,
-):
+async def OpenLong(df, balance, risk_manage, currentMODE, Lside, min_balance):
     try:
+        exchange = await connect()
         amount = buysize(
-            df, balance, risk_manage.symbol, exchange, risk_manage.RISK
+            df,
+            balance,
+            risk_manage["symbol"],
+            exchange,
+            risk_manage["risk_size"],
         )
         try:
-            info = (await exchange.fetch_bids_asks([risk_manage.symbol]))[
-                risk_manage.symbol
+            info = (await exchange.fetch_bids_asks([risk_manage["symbol"]]))[
+                risk_manage["symbol"]
             ]["info"]
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
             exchange = await connect()
-            info = (await exchange.fetch_bids_asks([risk_manage.symbol]))[
-                risk_manage.symbol
+            info = (await exchange.fetch_bids_asks([risk_manage["symbol"]]))[
+                risk_manage["symbol"]
             ]["info"]
         ask = float(info["askPrice"])
         print(f"price : {ask}")
         logging.info(
-            f"Entry Long {risk_manage.symbol} Long @{ask} qmt:{amount}"
+            f"Entry Long {risk_manage['symbol']} Long @{ask} qmt:{amount}"
         )
-        leve = await setleverage(risk_manage.symbol, risk_manage.lev, exchange)
-        if amount * ask > risk_manage.Max_Size * int(leve):
-            amount = risk_manage.Max_Size * int(leve) / ask
+        leve = await setleverage(
+            risk_manage["symbol"], risk_manage["leverage"], exchange
+        )
+        if amount * ask > risk_manage["max_size"] * int(leve):
+            amount = risk_manage["max_size"] * int(leve) / ask
         free = float(balance["free"]["USDT"])
-        amttp1 = amount * (risk_manage.TPPer / 100)
-        amttp2 = amount * (risk_manage.TPPer2 / 100)
+        amttp1 = amount * (risk_manage["tp_percent"] / 100)
+        amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
         low = df["lowest"][len(df.index) - 1]
         if free > min_balance:
             try:
                 order = await exchange.create_market_order(
-                    risk_manage.symbol,
+                    risk_manage["symbol"],
                     "buy",
                     amount,
                     params={"positionSide": Lside},
@@ -365,37 +431,36 @@ async def OpenLong(
                 logging.debug(e)
                 notify_send(e)
                 return
-            if risk_manage.USETP:
+            if risk_manage["use_tp_1"]:
                 await USETPLONG(
-                    risk_manage.symbol,
+                    risk_manage["symbol"],
                     df,
                     exchange,
                     ask,
-                    risk_manage.TPRR1,
-                    risk_manage.TPRR2,
+                    risk_manage["risk_reward_1"],
+                    risk_manage["risk_reward_2"],
                     Lside,
                     amttp1,
                     amttp2,
-                    risk_manage.USETP2,
+                    risk_manage["use_tp_2"],
                 )
-            if risk_manage.USESL:
+            if risk_manage["use_sl"]:
                 await USESLLONG(
                     df,
-                    risk_manage.symbol,
+                    risk_manage["symbol"],
                     exchange,
                     ask,
                     amount,
                     low,
                     Lside,
-                    risk_manage.Tailing_SL,
+                    risk_manage["use_tailing"],
                     currentMODE,
                 )
-            await asyncio.sleep(1)
             margin = ask * amount / int(leve)
             total = float(balance["total"]["USDT"])
             msg = (
                 "BINANCE:"
-                + f"\nCoin        : {risk_manage.symbol}"
+                + f"\nCoin        : {risk_manage['symbol']}"
                 + "\nStatus      : OpenShort[SELL]"
                 + f"\nAmount      : {amount}({round((amount * ask), 2)}USDT)"
                 + f"\nPrice       : {ask}USDT"
@@ -409,7 +474,7 @@ async def OpenLong(
                 + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
             )
         notify_send(msg)
-        candle(df, risk_manage.symbol, risk_manage.tf)
+        candle(df, risk_manage["symbol"], risk_manage["timeframe"])
         return
     except Exception as e:
         print(e)
@@ -460,45 +525,45 @@ async def USETPSHORT(
 
 
 # OpenShort=Sell
-async def OpenShort(
-    df,
-    balance,
-    risk_manage,
-    exchange,
-    currentMODE,
-    Sside,
-):
+async def OpenShort(df, balance, risk_manage, currentMODE, Sside, min_balance):
     try:
+        exchange = await connect()
         amount = sellsize(
-            df, balance, risk_manage.symbol, exchange, risk_manage.RISK
+            df,
+            balance,
+            risk_manage["symbol"],
+            exchange,
+            risk_manage["risk_size"],
         )
         try:
-            info = (await exchange.fetch_bids_asks([risk_manage.symbol]))[
-                risk_manage.symbol
+            info = (await exchange.fetch_bids_asks([risk_manage["symbol"]]))[
+                risk_manage["symbol"]
             ]["info"]
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
+
             exchange = await connect()
-            info = (await exchange.fetch_bids_asks([risk_manage.symbol]))[
-                risk_manage.symbol
+            info = (await exchange.fetch_bids_asks([risk_manage["symbol"]]))[
+                risk_manage["symbol"]
             ]["info"]
         bid = float(info["bidPrice"])
         logging.info(
-            f"Entry Short {risk_manage.symbol} Short @{bid} qmt:{amount}"
+            f"Entry Short {risk_manage['symbol']} Short @{bid} qmt:{amount}"
         )
-        leve = await setleverage(risk_manage.symbol, risk_manage.lev, exchange)
-        if amount * bid > risk_manage.Max_Size * int(leve):
-            amount = risk_manage.Max_Size * int(leve) / bid
+        leve = await setleverage(
+            risk_manage["symbol"], risk_manage["leverage"], exchange
+        )
+        if amount * bid > risk_manage["max_size"] * int(leve):
+            amount = risk_manage["max_size"] * int(leve) / bid
         free = float(balance["free"]["USDT"])
-        amttp1 = amount * (risk_manage.TPPer / 100)
-        amttp2 = amount * (risk_manage.TPPer2 / 100)
+        amttp1 = amount * (risk_manage["tp_percent"] / 100)
+        amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
         high = df["Highest"][len(df.index) - 1]
         if free > min_balance:
             try:
                 order = await exchange.create_market_order(
-                    risk_manage.symbol,
+                    risk_manage["symbol"],
                     "sell",
                     amount,
                     params={"positionSide": Sside},
@@ -508,37 +573,36 @@ async def OpenShort(
                 logging.debug(e)
                 notify_send(e)
                 return
-            if risk_manage.USESL:
+            if risk_manage["use_sl"]:
                 await USESLSHORT(
                     df,
-                    risk_manage.symbol,
+                    risk_manage["symbol"],
                     exchange,
                     bid,
                     amount,
                     high,
                     Sside,
-                    risk_manage.Tailing_SL,
+                    risk_manage["use_tailing"],
                     currentMODE,
                 )
-            if risk_manage.USETP:
+            if risk_manage["use_tp_1"]:
                 await USETPSHORT(
-                    risk_manage.symbol,
+                    risk_manage["symbol"],
                     df,
                     exchange,
                     bid,
-                    risk_manage.TPRR1,
-                    risk_manage.TPRR2,
+                    risk_manage["risk_reward_1"],
+                    risk_manage["risk_reward_2"],
                     Sside,
                     amttp1,
                     amttp2,
-                    risk_manage.USETP2,
+                    risk_manage["use_tp_2"],
                 )
-            time.sleep(1)
             margin = bid * amount / int(leve)
             total = float(balance["total"]["USDT"])
             msg = (
                 "BINANCE:"
-                + f"\nCoin        : {risk_manage.symbol}"
+                + f"\nCoin        : {risk_manage['symbol']}"
                 + "\nStatus      : OpenShort[SELL]"
                 + f"\nAmount      : {amount}({round((amount * bid), 2)}USDT)"
                 + f"\nPrice       : {bid}USDT"
@@ -552,7 +616,8 @@ async def OpenShort(
                 + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
             )
         notify_send(msg)
-        candle(df, risk_manage.symbol, risk_manage.tf)
+        candle(df, risk_manage["symbol"], risk_manage["timeframe"])
+        return await disconnect(exchange)
     except Exception as e:
         print(e)
         logging.info(e)
@@ -561,8 +626,9 @@ async def OpenShort(
 
 
 # CloseLong=Sell
-async def CloseLong(df, balance, symbol, amt, pnl, exchange, Lside, tf):
+async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
     try:
+        exchange = await connect()
         amount = abs(amt)
         upnl = pnl
         try:
@@ -572,7 +638,6 @@ async def CloseLong(df, balance, symbol, amt, pnl, exchange, Lside, tf):
             print(e)
             logging.info(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
             exchange = await connect()
             response = await exchange.fetch_bids_asks([symbol])
             info = response[symbol]["info"]
@@ -585,7 +650,6 @@ async def CloseLong(df, balance, symbol, amt, pnl, exchange, Lside, tf):
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
             logging.info(e)
             exchange = await connect()
             order = await exchange.create_market_order(
@@ -604,6 +668,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, exchange, Lside, tf):
         )
         notify_send(msg)
         candle(df, symbol, tf)
+        return await disconnect(exchange)
     except Exception as e:
         print(e)
         notify_send(f"เกิดความผิดพลาดในการออก Order {e}")
@@ -611,8 +676,9 @@ async def CloseLong(df, balance, symbol, amt, pnl, exchange, Lside, tf):
 
 
 # CloseShort=Buy
-async def CloseShort(df, balance, symbol, amt, pnl, exchange, Sside, tf):
+async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
     try:
+        exchange = await connect()
         amount = abs(amt)
         upnl = pnl
         try:
@@ -620,7 +686,6 @@ async def CloseShort(df, balance, symbol, amt, pnl, exchange, Sside, tf):
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
             logging.info(e)
             exchange = await connect()
             info = (await exchange.fetch_bids_asks([symbol]))[symbol]["info"]
@@ -633,7 +698,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, exchange, Sside, tf):
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
+
             logging.info(e)
             exchange = await connect()
             order = await exchange.create_market_order(
@@ -652,6 +717,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, exchange, Sside, tf):
         )
         notify_send(msg)
         candle(df, symbol, tf)
+        return await disconnect(exchange)
     except Exception as e:
         print(e)
         notify_send(f"เกิดความผิดพลาดในการออก Order {e}")
@@ -669,7 +735,7 @@ async def feed(df, risk_manage):
     except Exception as e:
         print(e)
         await disconnect(exchange)
-        await asyncio.sleep(10)
+
         logging.info(e)
         exchange = await connect()
         balance = await exchange.fetch_balance({"type": "future"})
@@ -695,6 +761,9 @@ async def feed(df, risk_manage):
     upnl = 0.0
     margin = 0.0
     netunpl = 0.0
+    config = AppConfig()
+    max_margin = config.max_margin
+    min_balance = config.min_balance
     for i in status.index:
         margin += float(status["initialMargin"][i])
         netunpl += float(status["unrealizedProfit"][i])
@@ -705,7 +774,7 @@ async def feed(df, risk_manage):
     except Exception as e:
         print(e)
         await disconnect(exchange)
-        await asyncio.sleep(10)
+
         logging.info(e)
         exchange = await connect()
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
@@ -713,8 +782,8 @@ async def feed(df, risk_manage):
         notify_send(
             "Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
             f"ที่กำหนดไว้ : {max_margin}",
-            sticker_id=17857,
-            package_id=1070,
+            sticker=17857,
+            package=1070,
         )
     for i in status.index:
         if status["symbol"][i] == posim:
@@ -743,6 +812,7 @@ async def feed(df, risk_manage):
         is_in_Short = False
         is_in_Long = False
     last = len(df.index) - 1
+    await disconnect(exchange)
     if df["BUY"][last] == 1:
         print("changed to Bullish, buy")
         if is_in_Short:
@@ -750,22 +820,21 @@ async def feed(df, risk_manage):
             await CloseShort(
                 df,
                 balance,
-                risk_manage.symbol,
+                risk_manage["symbol"],
                 amt,
                 upnl,
-                exchange,
                 Sside,
-                risk_manage.tf,
+                risk_manage["timeframe"],
             )
-        elif not is_in_Long and risk_manage.USELONG:
-            await exchange.cancel_all_orders(risk_manage.symbol)
+        elif not is_in_Long and risk_manage["use_long"]:
+            await exchange.cancel_all_orders(risk_manage["symbol"])
             await OpenLong(
                 df,
                 balance,
                 risk_manage,
-                exchange,
                 currentMODE,
                 Lside,
+                min_balance,
             )
         else:
             print("already in position, nothing to do")
@@ -776,23 +845,21 @@ async def feed(df, risk_manage):
             await CloseLong(
                 df,
                 balance,
-                risk_manage.symbol,
+                risk_manage["symbol"],
                 amt,
                 upnl,
-                exchange,
                 Lside,
-                risk_manage.tf,
+                risk_manage["timeframe"],
             )
-        elif not is_in_Short and risk_manage.USESHORT:
-            await exchange.cancel_all_orders(risk_manage.symbol)
+        elif not is_in_Short and risk_manage["use_short"]:
+            await exchange.cancel_all_orders(risk_manage["symbol"])
             await OpenShort(
                 df,
                 balance,
                 risk_manage,
-                exchange,
                 currentMODE,
                 Sside,
+                min_balance,
             )
         else:
             print("already in position, nothing to do")
-    await disconnect(exchange)

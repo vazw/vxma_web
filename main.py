@@ -13,8 +13,8 @@ from vxma_d.AppData import Bot
 
 
 def main():
-    while True:
-        asyncio.run(Bot.run_bot())
+    # while True:
+    asyncio.run(Bot.run_bot())
 
 
 if __name__ == "__main__":

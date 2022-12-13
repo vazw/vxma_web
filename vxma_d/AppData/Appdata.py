@@ -42,6 +42,33 @@ s = mplf.make_mpf_style(
     gridaxis="horizontal",
 )
 
+BOTCOL = [
+    "id",
+    "symbol",
+    "timeframe",
+    "ATR",
+    "ATR_m",
+    "EMA",
+    "subhag",
+    "smooth",
+    "RSI",
+    "Andean",
+    "Uselong",
+    "Useshort",
+    "UseTP",
+    "UseTP2",
+    "UseSL",
+    "Tail_SL",
+    "leverage",
+    "Pivot",
+    "RR1",
+    "RR2",
+    "TP1",
+    "TP2",
+    "Risk",
+    "maxMargin",
+]
+
 
 def bot_setting():
     symbolist = pd.read_csv("vxma_d/AppData/bot_config.csv")
@@ -94,28 +121,28 @@ def max_margin_size(size, free_balance) -> float:
 
 
 class RiskManageTable:
-    async def __init__(self, symbolist, free_balance):
-        self.symbol = symbolist["symbol"][0]
+    def __init__(self, symbolist, col_index, free_balance):
+        self.symbol = symbolist["symbol"][col_index]
         if self.symbol[0:4] == "1000":
             self.symbol = self.symbol[4 : len(self.symbol)]
-        self.timeframe = symbolist["timeframe"][0]
-        self.use_long = await self.check_bool(symbolist["Uselong"][0])
-        self.use_short = await self.check_bool(symbolist["Useshort"][0])
-        self.use_tp_1 = await self.check_bool(symbolist["UseTP1"][0])
-        self.use_tp_2 = await self.check_bool(symbolist["UseTP2"][0])
-        self.use_sl = await self.check_bool(symbolist["UseSL"][0])
-        self.use_tailing = await self.check_bool(symbolist["Tail_SL"])
+        self.timeframe = symbolist["timeframe"][col_index]
+        self.use_long = self.check_bool(symbolist["Uselong"][col_index])
+        self.use_short = self.check_bool(symbolist["Useshort"][col_index])
+        self.use_tp_1 = self.check_bool(symbolist["UseTP"][col_index])
+        self.use_tp_2 = self.check_bool(symbolist["UseTP2"][col_index])
+        self.use_sl = self.check_bool(symbolist["UseSL"][col_index])
+        self.use_tailing = self.check_bool(symbolist["Tail_SL"])
         self.max_size = max_margin_size(
-            str(symbolist["Max_Size"][0]), free_balance
+            str(symbolist["maxMargin"][col_index]), free_balance
         )
-        self.risk_size = str(symbolist["Risk"][0])
-        self.tp_percent = symbolist["TP1"][0]
-        self.tp_percent_2 = symbolist["TP2"][0]
-        self.risk_reward_1 = symbolist["RR1"][0]
-        self.risk_reward_2 = symbolist["RR2"][0]
-        self.leverage = symbolist["leverage"][0]
+        self.risk_size = str(symbolist["Risk"][col_index])
+        self.tp_percent = symbolist["TP1"][col_index]
+        self.tp_percent_2 = symbolist["TP2"][col_index]
+        self.risk_reward_1 = symbolist["RR1"][col_index]
+        self.risk_reward_2 = symbolist["RR2"][col_index]
+        self.leverage = symbolist["leverage"][col_index]
 
-    async def check_bool(self, arg):
+    def check_bool(self, arg):
         return True if str(arg).lower() == "true" else False
 
 
@@ -129,22 +156,6 @@ class TATable:
     rsi: int = 25
     aol: int = 30
     pivot: int = 60
-
-
-def callbackRate(data):
-    m = len(data.index)
-    try:
-        highest = data["highest"][m - 1]
-        lowest = data["lowest"][m - 1]
-        rate = round((highest - lowest) / highest * 100, 1)
-        if rate > 5:
-            rate = 5
-        elif rate < 0.1:
-            rate = 0.1
-        return rate
-    except Exception as e:
-        print(f"callbackRate is error : {e}")
-        return 2.5
 
 
 class AppConfig:
@@ -190,15 +201,15 @@ def notify_send(msg, sticker=None, package=None, image_path=None):
     config = AppConfig()
     notify = LineNotify(config.notify_token)
     if image_path is not None:
-        notify.send(message=msg, image_path=image_path)
+        return notify.send(message=msg, image_path=image_path)
     elif sticker is not None:
-        notify.send(
+        return notify.send(
             msg,
             sticker_id=sticker,
             package_id=package,
         )
     else:
-        notify.send(msg)
+        return notify.send(msg)
 
 
 def candle(df, symbol, tf):
@@ -241,6 +252,4 @@ def candle(df, symbol, tf):
             datetime_format="%y/%b/%d %H:%M",
             xrotation=20,
         )
-    notify_send(f"info : {titles}", image_path=("./candle.png"))
-    asyncio.sleep(0.5)
-    return
+    return notify_send(f"info : {titles}", image_path=("./candle.png"))

@@ -151,8 +151,8 @@ class vxma:
             up22 = up2[i] = up22 if pd.notnull(up22) else Close[i] ** 2
             dn11 = dn1[i] = dn11 if pd.notnull(dn11) else Close[i]
             dn22 = dn2[i] = dn22 if pd.notnull(dn22) else Close[i] ** 2
-            cBull[i] = math.sqrt(dn22 - (dn11**2))
-            cBear[i] = math.sqrt(up22 - (up11**2))
+            cBull[i] = math.sqrt(abs(dn22) - (dn11**2))
+            cBear[i] = math.sqrt(abs(up22) - (up11**2))
         return cBull, cBear
 
     # AlphaTrend

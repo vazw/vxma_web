@@ -12,7 +12,6 @@ import time
 import warnings
 from uuid import uuid4
 
-import ccxt.async_support as ccxt
 import mplfinance as mplf
 import pandas as pd
 
@@ -20,6 +19,7 @@ from vxma_d.AppData.Appdata import (
     RiskManageTable,
     TATable,
     bot_setting,
+    candle,
     notify_send,
 )
 from vxma_d.MarketEX.CCXT_Binance import (
@@ -106,107 +106,6 @@ s = mplf.make_mpf_style(
 )
 
 
-def candle(df, symbol, tf):
-    data = df.tail(60)
-    titles = f"{symbol}_{tf}"
-    try:
-        vxma = mplf.make_addplot(
-            data.vxma, secondary_y=False, color="blue", linewidths=0.2
-        )
-        buy = mplf.make_addplot(
-            data.buyPrice, secondary_y=False, color="green", scatter=True
-        )
-        sell = mplf.make_addplot(
-            data.sellPrice, secondary_y=False, color="red", scatter=True
-        )
-        mplf.plot(
-            data,
-            type="candle",
-            title=titles,
-            addplot=[vxma, buy, sell],
-            style=s,
-            volume=True,
-            savefig="candle.png",
-            tight_layout=True,
-            figratio=(9, 9),
-            datetime_format="%y/%b/%d %H:%M",
-            xrotation=20,
-        )
-    except Exception as e:
-        print(f"{e}")
-        mplf.plot(
-            data,
-            type="candle",
-            title=titles,
-            style=s,
-            volume=True,
-            savefig="candle.png",
-            tight_layout=True,
-            figratio=(9, 9),
-            datetime_format="%y/%b/%d %H:%M",
-            xrotation=20,
-        )
-    notify_send(f"info : {titles}", image_path=("./candle.png"))
-    asyncio.sleep(0.5)
-    return
-
-
-# Position Sizing
-def buysize(df, balance, symbol, exchange, RISK):
-    last = len(df.index) - 1
-    freeusd = float(balance["free"]["USDT"])
-    low = float(df["Lowest"][last])
-    if RISK[0] == "$":
-        risk = float(RISK[1 : len(RISK)])
-    elif RISK[0] == "%":
-        percent = float(RISK)
-        risk = (percent / 100) * freeusd
-    else:
-        risk = float(RISK)
-    amount = abs(risk / (df["close"][last] - low))
-    qty_precision = exchange.amount_to_precision(symbol, amount)
-    lot = qty_precision
-    return float(lot)
-
-
-def sellsize(df, balance, symbol, exchange, RISK):
-    last = len(df.index) - 1
-    freeusd = float(balance["free"]["USDT"])
-    high = float(df["Highest"][last])
-    if RISK[0] == "$":
-        risk = float(RISK[1 : len(RISK)])
-    elif RISK[0] == "%":
-        percent = float(RISK)
-        risk = (percent / 100) * freeusd
-    else:
-        risk = float(RISK)
-    amount = abs(risk / (high - df["close"][last]))
-    qty_precision = exchange.amount_to_precision(symbol, amount)
-    lot = qty_precision
-    return float(lot)
-
-
-# TP with Risk:Reward
-def RRTP(df, direction, step, price, TPRR1, TPRR2):
-    m = len(df.index)
-    if direction:
-        low = float(df["Lowest"][m - 1])
-        if step == 1:
-            target = price * (1 + ((price - low) / price) * float(TPRR1))
-            return float(target)
-        if step == 2:
-            target = price * (1 + ((price - low) / price) * float(TPRR2))
-            return float(target)
-    else:
-        high = float(df["Highest"][m - 1])
-        if step == 1:
-            target = price * (1 - ((high - price) / price) * float(TPRR1))
-            return float(target)
-        if step == 2:
-            target = price * (1 - ((high - price) / price) * float(TPRR2))
-            return float(target)
-
-
 async def bot_1(symbol, ta_data, tf):
     try:
         print("Bot 1 is running...")
@@ -248,8 +147,8 @@ async def bot_3(symbol, ta_data, tf):
 
 async def get_dailytasks():
     daycollum = ["Symbol", "LastPirce", "Long-Term", "Mid-Term", "Short-Term"]
-    dfday = pd.DataFrame(columns=daycollum)
     symbolist = await get_symbol()
+    print(len(symbolist))
     ta_data = TATable()
     for symbol in symbolist:
         try:
@@ -259,54 +158,44 @@ async def get_dailytasks():
                 bot_3(symbol, ta_data.__dict__, "1h"),
             )
 
-            candle(df1, symbol, "1d")
-            candle(df2, symbol, "6h")
-            candle(df3, symbol, "1h")
+            # candle(df1, symbol, "1d")
+            # candle(df2, symbol, "6h")
+            # candle(df3, symbol, "1h")
             if df1 is not None:
                 long_term = ta_score(df1)
                 mid_term = ta_score(df2)
                 short_term = ta_score(df3)
-                dfday = dfday.append(
-                    pd.Series(
-                        [
-                            symbol,
-                            df3["close"][len(df1.index) - 1],
-                            long_term.benchmarking(),
-                            mid_term.benchmarking(),
-                            short_term.benchmarking(),
-                        ],
-                        index=daycollum,
-                    ),
-                    ignore_index=True,
+                yield pd.Series(
+                    [
+                        symbol,
+                        df3["close"][len(df1.index) - 1],
+                        long_term.benchmarking(),
+                        mid_term.benchmarking(),
+                        short_term.benchmarking(),
+                    ],
+                    index=daycollum,
                 )
-            await asyncio.sleep(0.1)
         except Exception as e:
             print(e)
             logging.info(e)
             pass
-    return dfday
 
 
 async def dailyreport():
-    data = await get_dailytasks()
     try:
-        todays = str(data)
-        logging.info(f"{todays}")
-        data = data.set_index("Symbol")
-        data.drop(["Mid-Term", "LastPirce"], axis=1, inplace=True)
-        msg = str(data)
         notify_send(
-            f"คู่เทรดที่น่าสนใจในวันนี้\n{msg}",
-            sticker_id=1990,
-            package_id=446,
+            "คู่เทรดที่น่าสนใจในวันนี้\n",
+            sticker=1990,
+            package=446,
         )
+        async for line in get_dailytasks():
+            notify_send(msg=str(line))
         exchange = await connect()
         try:
             balance = await exchange.fetch_balance()
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(10)
             logging.info(e)
             exchange = await connect()
             balance = await exchange.fetch_balance()
@@ -334,7 +223,7 @@ async def dailyreport():
             margin += float(status["initialMargin"][i])
             netunpl += float(status["unrealizedProfit"][i])
         print(f"Margin Used : {margin}")
-        print(f"NET unrealizedProfit : {margin}")
+        print(f"NET unrealizedProfit : {netunpl}")
         status = status.sort_values(by=["unrealizedProfit"], ascending=False)
         status = status.head(1)
         print(status)
@@ -350,8 +239,8 @@ async def dailyreport():
         )
         notify_send(
             message,
-            sticker_id=1995,
-            package_id=446,
+            sticker=1995,
+            package=446,
         )
         await disconnect(exchange)
         return
@@ -380,14 +269,13 @@ async def running_module():
         except Exception as e:
             print(e)
             await disconnect(exchange)
-            await asyncio.sleep(2)
             logging.info(e)
             exchange = await connect()
             balance = await exchange.fetch_balance()
         if str(local_time[14:-9]) == "0" and not insession["hour"]:
             total = round(float(balance["total"]["USDT"]), 2)
             msg = f"Total Balance : {total} USDT"
-            notify_send(msg, sticker_id=10863, package_id=789)
+            notify_send(msg, sticker=10863, package=789)
             insession["hour"] = True
         free_balance = float(balance["free"]["USDT"])
         await disconnect(exchange)
@@ -404,28 +292,23 @@ async def running_module():
                 aol=symbolist["Andean"][i],
                 pivot=symbolist["Pivot"][i],
             )
-            risk_manage_data = await RiskManageTable(
-                symbolist[i], free_balance
+            risk_manage_data = RiskManageTable(symbolist, i, free_balance)
+            data = await bot_1(
+                risk_manage_data.symbol,
+                ta_table_data.__dict__,
+                risk_manage_data.timeframe,
             )
-            print(risk_manage_data)
-            data = await asyncio.gather(
-                bot_1(
-                    risk_manage_data.symbol,
-                    ta_table_data.__dict__,
-                    risk_manage_data.timeframe,
-                )
-            )
-            await asyncio.gather(feed(data, risk_manage_data))
-            await asyncio.sleep(1)
+            await asyncio.gather(feed(data, risk_manage_data.__dict__))
             print("Bot is running...")
             # except Exception as e:
             #     print(e)
             #     pass
         await asyncio.sleep(1)
     else:
-        await asyncio.sleep(1)
+        await asyncio.sleep(60)
         print("Nothing to do now.....")
 
 
 async def run_bot():
-    await asyncio.gather(running_module())
+    # await asyncio.gather(running_module())
+    await asyncio.gather(dailyreport())

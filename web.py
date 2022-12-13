@@ -30,7 +30,7 @@ from dash import (
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
-from vxma_d.AppData.Appdata import bot_setting, config_setting, cooking, perf
+from vxma_d.AppData.Appdata import BOTCOL, bot_setting, cooking, perf
 from vxma_d.Strategy.ematalib import EMA_CROSS as EMA
 from vxma_d.Strategy.vxmatalib import vxma as indi
 
@@ -121,32 +121,6 @@ TIMEFRAMES_DICT = {
     "1w": "1w",
     "1M": "1M",
 }
-BOTCOL = [
-    "id",
-    "symbol",
-    "timeframe",
-    "ATR",
-    "ATR_m",
-    "EMA",
-    "subhag",
-    "smooth",
-    "RSI",
-    "Andean",
-    "Uselong",
-    "Useshort",
-    "UseTP",
-    "UseTP2",
-    "UseSL",
-    "Tail_SL",
-    "leverage",
-    "Pivot",
-    "RR1",
-    "RR2",
-    "TP1",
-    "TP2",
-    "Risk",
-    "maxMargin",
-]
 
 
 nomEX = ccxt.binance()
@@ -1504,11 +1478,11 @@ def excuteBot(
                 maxMargin,
             ]
             try:
-                data = pd.read_csv("bot_config.csv")
+                data = pd.read_csv("vxma_d/AppData/bot_config.csv")
                 data = data.append(
                     pd.Series(compo, index=BOTCOL), ignore_index=True
                 )
-                data.to_csv("bot_config.csv", index=False)
+                data.to_csv("vxma_d/AppData/bot_config.csv", index=False)
                 # notify.send("Setting บอทเรียบร้อย บอทกำลังทำงาน!")
                 return [
                     dbc.Alert(
