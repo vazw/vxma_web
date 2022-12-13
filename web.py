@@ -32,7 +32,12 @@ from dash.exceptions import PreventUpdate
 
 from vxma_d.AppData.Appdata import BOTCOL, bot_setting, cooking, perf
 from vxma_d.Strategy.ematalib import EMA_CROSS as EMA
-from vxma_d.Strategy.vxmatalib import vxma as indi
+
+try:
+    from vxma_d.Strategy.vxmatalib import vxma as indi
+except Exception as e:
+    print(e)
+    from vxma_d.Strategy.vxma_pandas_ta import vxma as indi
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
