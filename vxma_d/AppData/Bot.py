@@ -181,6 +181,10 @@ async def get_dailytasks():
             pass
 
 
+def remove_last_line_from_string(s):
+    return s[: s.rfind("\n")]
+
+
 async def dailyreport():
     try:
         notify_send(
@@ -189,7 +193,8 @@ async def dailyreport():
             package=446,
         )
         async for line in get_dailytasks():
-            notify_send(msg=str(line))
+            msg1 = remove_last_line_from_string(str(line))
+            notify_send(msg=msg1)
         exchange = await connect()
         try:
             balance = await exchange.fetch_balance()
@@ -280,29 +285,30 @@ async def running_module():
         free_balance = float(balance["free"]["USDT"])
         await disconnect(exchange)
         for i in symbolist.index:
+            try:
 
-            # try:
-            ta_table_data = TATable(
-                atr_p=symbolist["ATR"][i],
-                atr_m=symbolist["ATR_m"][i],
-                ema=symbolist["EMA"][i],
-                linear=symbolist["subhag"][i],
-                smooth=symbolist["smooth"][i],
-                rsi=symbolist["RSI"][i],
-                aol=symbolist["Andean"][i],
-                pivot=symbolist["Pivot"][i],
-            )
-            risk_manage_data = RiskManageTable(symbolist, i, free_balance)
-            data = await bot_1(
-                risk_manage_data.symbol,
-                ta_table_data.__dict__,
-                risk_manage_data.timeframe,
-            )
-            await asyncio.gather(feed(data, risk_manage_data.__dict__))
-            print("Bot is running...")
-            # except Exception as e:
-            #     print(e)
-            #     pass
+                ta_table_data = TATable(
+                    atr_p=symbolist["ATR"][i],
+                    atr_m=symbolist["ATR_m"][i],
+                    ema=symbolist["EMA"][i],
+                    linear=symbolist["subhag"][i],
+                    smooth=symbolist["smooth"][i],
+                    rsi=symbolist["RSI"][i],
+                    aol=symbolist["Andean"][i],
+                    pivot=symbolist["Pivot"][i],
+                )
+                risk_manage_data = RiskManageTable(symbolist, i, free_balance)
+                data = await bot_1(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.timeframe,
+                )
+                await asyncio.gather(feed(data, risk_manage_data.__dict__))
+                print("Bot is running...")
+
+            except Exception as e:
+                print(e)
+                pass
         await asyncio.sleep(1)
     else:
         await asyncio.sleep(60)
