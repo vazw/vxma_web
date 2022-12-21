@@ -37,7 +37,6 @@ from vxma_d.AppData.Appdata import (
     notify_send,
     perf,
 )
-from vxma_d.Strategy.ematalib import EMA_CROSS as EMA
 
 try:
     from vxma_d.Strategy.vxmatalib import vxma as indi
@@ -477,12 +476,12 @@ edit_table = dcc.ConfirmDialogProvider(
         dmc.Button(
             "Edit Data",
             variant="light",
-            id="edit-table",
             color="red",
             n_clicks=0,
             size="md",
         )
     ],
+    id="edit-table",
     message="ชัวร์แล้วนาาา?",
     submit_n_clicks=0,
 )
@@ -564,7 +563,6 @@ login_page = dmc.Center(
 
 Summary_page = dmc.Container(
     [
-        refresher_i,
         dmc.Grid(
             [
                 dmc.Col(
@@ -610,7 +608,6 @@ Summary_page = dmc.Container(
 
 vxma_page = dmc.Container(
     [
-        refresher_i,
         dmc.Grid(
             [
                 dmc.Col(
@@ -728,120 +725,118 @@ vxma_page = dmc.Container(
 )
 
 
-EMA_page = dmc.Container(
-    [
-        refresher_i,
-        dmc.Grid(
-            [
-                dmc.Col(
-                    [
-                        option_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col(
-                    [
-                        Margin_input,
-                        RRTP1_input,
-                        RRTP2_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col([RISK_input, perTP1_input, perTP2_input], span=1),
-                dmc.Col(
-                    [
-                        Leverage_input,
-                        EMAFAST_input,
-                        EMASLOW_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col(
-                    [
-                        dmc.Stack(
-                            [
-                                symbol_dropdown,
-                                Apply_input,
-                                ready_input,
-                                Runbot_input,
-                            ],
-                            align="flex-start",
-                            spacing="xs",
-                        ),
-                    ],
-                    span=1,
-                ),
-            ],
-            justify="space-between",
-            align="flex-start",
-            gutter="md",
-            grow=True,
-        ),
-        html.Hr(),
-        dbc.Row(
-            [
-                dcc.Graph(id="clientside-graph-ema"),
-                dcc.Store(id="clientside-store-figure-ema"),
-            ]
-        ),
-        html.Hr(),
-        dbc.Row(
-            [
-                dmc.Grid(
-                    [
-                        dmc.Col(
-                            [
-                                html.H5(
-                                    "ตรวจดูตั้งค่าทุกครั้ง!!",
-                                    style={"color": "red"},
-                                )
-                            ],
-                            span=1,
-                        ),
-                        dmc.Col(
-                            [
-                                html.Div(id="alert-ema"),
-                            ],
-                            span=1,
-                        ),
-                        dmc.Col(
-                            [
-                                dmc.Group(
-                                    [timeframe_dropdown, num_bars_input]
-                                ),
-                            ],
-                            span=1,
-                            offset=1,
-                        ),
-                    ],
-                    justify="space-between",
-                    align="flex-end",
-                    gutter="md",
-                    grow=True,
-                )
-            ]
-        ),
-        html.Hr(),
-        dbc.Row(
-            [
-                dmc.Paper(
-                    children=[
-                        dmc.Text(
-                            "by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm",  # noqa:
-                            size="xs",
-                        )
-                    ],
-                    shadow="xs",
-                )
-            ]
-        ),
-    ]
-)
+# EMA_page = dmc.Container(
+#     [
+#         dmc.Grid(
+#             [
+#                 dmc.Col(
+#                     [
+#                         option_input,
+#                     ],
+#                     span=1,
+#                 ),
+#                 dmc.Col(
+#                     [
+#                         Margin_input,
+#                         RRTP1_input,
+#                         RRTP2_input,
+#                     ],
+#                     span=1,
+#                 ),
+#                 dmc.Col([RISK_input, perTP1_input, perTP2_input], span=1),
+#                 dmc.Col(
+#                     [
+#                         Leverage_input,
+#                         EMAFAST_input,
+#                         EMASLOW_input,
+#                     ],
+#                     span=1,
+#                 ),
+#                 dmc.Col(
+#                     [
+#                         dmc.Stack(
+#                             [
+#                                 symbol_dropdown,
+#                                 Apply_input,
+#                                 ready_input,
+#                                 Runbot_input,
+#                             ],
+#                             align="flex-start",
+#                             spacing="xs",
+#                         ),
+#                     ],
+#                     span=1,
+#                 ),
+#             ],
+#             justify="space-between",
+#             align="flex-start",
+#             gutter="md",
+#             grow=True,
+#         ),
+#         html.Hr(),
+#         dbc.Row(
+#             [
+#                 dcc.Graph(id="clientside-graph-ema"),
+#                 dcc.Store(id="clientside-store-figure-ema"),
+#             ]
+#         ),
+#         html.Hr(),
+#         dbc.Row(
+#             [
+#                 dmc.Grid(
+#                     [
+#                         dmc.Col(
+#                             [
+#                                 html.H5(
+#                                     "ตรวจดูตั้งค่าทุกครั้ง!!",
+#                                     style={"color": "red"},
+#                                 )
+#                             ],
+#                             span=1,
+#                         ),
+#                         dmc.Col(
+#                             [
+#                                 html.Div(id="alert-ema"),
+#                             ],
+#                             span=1,
+#                         ),
+#                         dmc.Col(
+#                             [
+#                                 dmc.Group(
+#                                     [timeframe_dropdown, num_bars_input]
+#                                 ),
+#                             ],
+#                             span=1,
+#                             offset=1,
+#                         ),
+#                     ],
+#                     justify="space-between",
+#                     align="flex-end",
+#                     gutter="md",
+#                     grow=True,
+#                 )
+#             ]
+#         ),
+#         html.Hr(),
+#         dbc.Row(
+#             [
+#                 dmc.Paper(
+#                     children=[
+#                         dmc.Text(
+#                             "by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm",  # noqa:
+#                             size="xs",
+#                         )
+#                     ],
+#                     shadow="xs",
+#                 )
+#             ]
+#         ),
+#     ]
+# )
 
 
 RunningBot_page = dmc.Container(
     [
-        refresher_i,
         dmc.Grid(
             [
                 dmc.Col(
@@ -896,7 +891,6 @@ RunningBot_page = dmc.Container(
 
 Setting_page = dmc.Container(
     [
-        refresher_i,
         dmc.Grid(
             [
                 dmc.Col(
@@ -1003,6 +997,7 @@ index_page = dmc.MantineProvider(
                                 children=[
                                     dmc.Center(
                                         [
+                                            refresher_i,
                                             dcc.Interval(
                                                 id="session", interval=900000
                                             ),
@@ -1027,7 +1022,7 @@ index_page = dmc.MantineProvider(
                     [
                         dmc.Tab("Summary", value="sumarry"),
                         dmc.Tab("VXMA bot", value="vxma"),
-                        dmc.Tab("EMA bot", value="ema"),
+                        # dmc.Tab("EMA bot", value="ema"),
                         dmc.Tab("Running Bot", value="running"),
                         dmc.Tab("Setting", value="setting"),
                     ],
@@ -1036,7 +1031,7 @@ index_page = dmc.MantineProvider(
                 ),
                 dmc.TabsPanel(Summary_page, value="sumarry"),
                 dmc.TabsPanel(vxma_page, value="vxma"),
-                dmc.TabsPanel(EMA_page, value="ema"),
+                # dmc.TabsPanel(EMA_page, value="ema"),
                 dmc.TabsPanel(RunningBot_page, value="running"),
                 dmc.TabsPanel(Setting_page, value="setting"),
             ],
@@ -1277,119 +1272,119 @@ app.clientside_callback(
 )
 
 
-# EMA strategy
-@app.callback(
-    Output("clientside-store-figure-ema", "data"),
-    Input("update", "n_intervals"),
-    Input("Apply-strategy", "n_clicks"),
-    State("symbol-dropdown", "value"),
-    State("timeframe-dropdown", "value"),
-    State("num-bar-input", "value"),
-    State("emafast-input", "value"),
-    State("emaslow-input", "value"),
-    prevent_initial_call=True,
-)
-def update_EMA_chart(
-    interval, click, symbol, timeframe, zoom, emafast, emaslow
-):
-    timeframe = TIMEFRAMES_DICT[timeframe]
-    num_bars = ZOOM_DICT[zoom]
-    try:
-        bars = nomEX.fetch_ohlcv(
-            symbol, timeframe=timeframe, since=None, limit=barsC
-        )
-    except Exception as e:
-        print(e)
-        logging.info(e)
-        time.sleep(2)
-        bars = nomEX.fetch_ohlcv(
-            symbol, timeframe=timeframe, since=None, limit=barsC
-        )
-    df = pd.DataFrame(
-        bars, columns=["timestamp", "open", "high", "low", "close", "volume"]
-    )
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True).map(
-        lambda x: x.tz_convert("Asia/Bangkok")
-    )
-    df = df.set_index("timestamp")
-    df = EMA(df, emafast, emaslow)
-    data = df.tail(num_bars)
-    fig = go.Figure(
-        data=go.Candlestick(
-            x=data.index,
-            open=data["open"],
-            high=data["high"],
-            low=data["low"],
-            close=data["close"],
-            showlegend=False,
-            name=f"{symbol}",
-        ),
-        layout=dict(autosize=True, template="plotly_dark"),
-    )
-    ema1 = go.Scatter(
-        x=data.index,
-        y=data["EMA_FAST"],
-        mode="lines",
-        line=go.scatter.Line(color="blue"),
-        showlegend=True,
-        name="FAST",
-    )
-    ema2 = go.Scatter(
-        x=data.index,
-        y=data["EMA_SLOW"],
-        mode="lines",
-        line=go.scatter.Line(color="yellow"),
-        showlegend=True,
-        name="SLOW",
-    )
-    buy = go.Scatter(
-        x=data.index,
-        y=data["buyPrice"],
-        mode="markers",
-        marker=dict(size=15, color="lime"),
-        showlegend=True,
-        name="Buy",
-    )
-    sell = go.Scatter(
-        x=data.index,
-        y=data["sellPrice"],
-        mode="markers",
-        marker=dict(size=15, color="orange"),
-        showlegend=True,
-        name="Sell",
-    )
-    fig.add_trace(ema1)
-    fig.add_trace(ema2)
-    fig.add_trace(buy)
-    fig.add_trace(sell)
-    fig.update(layout_xaxis_rangeslider_visible=False)
-    fig.update_layout(yaxis={"side": "right"})
-    fig.layout.xaxis.fixedrange = True
-    fig.layout.yaxis.fixedrange = True
-    return fig
+# # EMA strategy
+# @app.callback(
+#     Output("clientside-store-figure-ema", "data"),
+#     Input("update", "n_intervals"),
+#     Input("Apply-strategy", "n_clicks"),
+#     State("symbol-dropdown", "value"),
+#     State("timeframe-dropdown", "value"),
+#     State("num-bar-input", "value"),
+#     State("emafast-input", "value"),
+#     State("emaslow-input", "value"),
+#     prevent_initial_call=True,
+# )
+# def update_EMA_chart(
+#     interval, click, symbol, timeframe, zoom, emafast, emaslow
+# ):
+#     timeframe = TIMEFRAMES_DICT[timeframe]
+#     num_bars = ZOOM_DICT[zoom]
+#     try:
+#         bars = nomEX.fetch_ohlcv(
+#             symbol, timeframe=timeframe, since=None, limit=barsC
+#         )
+#     except Exception as e:
+#         print(e)
+#         logging.info(e)
+#         time.sleep(2)
+#         bars = nomEX.fetch_ohlcv(
+#             symbol, timeframe=timeframe, since=None, limit=barsC
+#         )
+#     df = pd.DataFrame(
+#         bars, columns=["timestamp", "open", "high", "low", "close", "volume"]
+#     )
+#   df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True).map(
+#         lambda x: x.tz_convert("Asia/Bangkok")
+#     )
+#     df = df.set_index("timestamp")
+#     df = EMA(df, emafast, emaslow)
+#     data = df.tail(num_bars)
+#     fig = go.Figure(
+#         data=go.Candlestick(
+#             x=data.index,
+#             open=data["open"],
+#             high=data["high"],
+#             low=data["low"],
+#             close=data["close"],
+#             showlegend=False,
+#             name=f"{symbol}",
+#         ),
+#         layout=dict(autosize=True, template="plotly_dark"),
+#     )
+#     ema1 = go.Scatter(
+#         x=data.index,
+#         y=data["EMA_FAST"],
+#         mode="lines",
+#         line=go.scatter.Line(color="blue"),
+#         showlegend=True,
+#         name="FAST",
+#     )
+#     ema2 = go.Scatter(
+#         x=data.index,
+#         y=data["EMA_SLOW"],
+#         mode="lines",
+#         line=go.scatter.Line(color="yellow"),
+#         showlegend=True,
+#         name="SLOW",
+#     )
+#     buy = go.Scatter(
+#         x=data.index,
+#         y=data["buyPrice"],
+#         mode="markers",
+#         marker=dict(size=15, color="lime"),
+#         showlegend=True,
+#         name="Buy",
+#     )
+#     sell = go.Scatter(
+#         x=data.index,
+#         y=data["sellPrice"],
+#         mode="markers",
+#         marker=dict(size=15, color="orange"),
+#         showlegend=True,
+#         name="Sell",
+#     )
+#     fig.add_trace(ema1)
+#     fig.add_trace(ema2)
+#     fig.add_trace(buy)
+#     fig.add_trace(sell)
+#     fig.update(layout_xaxis_rangeslider_visible=False)
+#     fig.update_layout(yaxis={"side": "right"})
+#     fig.layout.xaxis.fixedrange = True
+#     fig.layout.yaxis.fixedrange = True
+#     return fig
 
 
 # Clientside callback
-app.clientside_callback(
-    """
-    function(figure_data, title_text) {
-        if(figure_data === undefined) {
-            return {'data': [], 'layout': {}};
-        }
-        const fig = Object.assign({}, figure_data, {
-                'layout': {
-                    ...figure_data.layout,
-                    'title': {
-                        ...figure_data.layout.title, text: title_text
-                    }
-                }
-        });
-        return fig;
-    }
-    """,
-    Output("clientside-graph-ema", "figure"),
-    Input("clientside-store-figure-ema", "data"),
-)
+# app.clientside_callback(
+#     """
+#     function(figure_data, title_text) {
+#         if(figure_data === undefined) {
+#             return {'data': [], 'layout': {}};
+#         }
+#         const fig = Object.assign({}, figure_data, {
+#                 'layout': {
+#                     ...figure_data.layout,
+#                     'title': {
+#                         ...figure_data.layout.title, text: title_text
+#                     }
+#                 }
+#         });
+#         return fig;
+#     }
+#     """,
+#     Output("clientside-graph-ema", "figure"),
+#     Input("clientside-store-figure-ema", "data"),
+# )
 
 
 # #VXMA Execute bot
@@ -1679,8 +1674,6 @@ def resetpwd(click, pwd1, pwd2, id):
 @app.callback(
     Output("datatable", "children"),
     Input("update-table", "n_clicks"),
-    background=True,
-    prevent_initial_call=True,
 )
 def runningBot(click):
     if click is not None:
@@ -1702,7 +1695,7 @@ def runningBot(click):
 # #write data edit running bot
 @app.callback(
     Output("alert-bot", "children"),
-    Input("edit-table", "n_clicks"),
+    Input("edit-table", "submit_n_clicks"),
     State("datatable", "data"),
     State("edit-input", "checked"),
     prevent_initial_call=True,
@@ -1712,6 +1705,7 @@ def edit_menu(click, rows, ready):
         if ready:
             try:
                 df = pd.DataFrame(rows, columns=BOTCOL)
+                df = df.dropna(axis=0, how="any")
                 df.to_csv("bot_config.csv", index=False)
                 return [
                     dbc.Alert(

@@ -19,15 +19,89 @@
 #         input_result.append(input)
 #     return input_result
 import asyncio
+import os
 
-from vxma_d.AppData.Candle_ohlc import Download_Candle
+import mplfinance as mplf
+
+from vxma_d.Strategy.Candle_ohlc import downloadCandle, downloadMultiCandle
+
+rcs = {
+    "axes.labelcolor": "none",
+    "axes.spines.left": False,
+    "axes.spines.right": False,
+    "axes.axisbelow": False,
+    "axes.grid": True,
+    "grid.linestyle": ":",
+    "axes.titlesize": "xx-large",
+    "axes.titleweight": "bold",
+}
+
+
+color = mplf.make_marketcolors(
+    up="white", down="black", wick="black", edge="black"
+)
+s = mplf.make_mpf_style(
+    rc=rcs,
+    y_on_right=True,
+    marketcolors=color,
+    figcolor="white",
+    gridaxis="horizontal",
+)
+
+
+def candle(df, symbol, tf):
+    data = df
+    titles = f"{symbol}_{tf}"
+    try:
+        vxma = mplf.make_addplot(
+            data.vxma, secondary_y=False, color="blue", linewidths=0.2
+        )
+        buy = mplf.make_addplot(
+            data.buyPrice, secondary_y=False, color="green", scatter=True
+        )
+        sell = mplf.make_addplot(
+            data.sellPrice, secondary_y=False, color="red", scatter=True
+        )
+        mplf.plot(
+            data,
+            type="candle",
+            title=titles,
+            addplot=[vxma, buy, sell],
+            style=s,
+            volume=True,
+            tight_layout=True,
+            figratio=(9, 9),
+            datetime_format="%y/%b/%d %H:%M",
+            xrotation=20,
+        )
+    except Exception as e:
+        print(f"{e}")
+        mplf.plot(
+            data,
+            type="candle",
+            title=titles,
+            style=s,
+            volume=True,
+            tight_layout=True,
+            figratio=(9, 9),
+            datetime_format="%y/%b/%d %H:%M",
+            xrotation=20,
+        )
+    return
+
+
+symbols = ["BTC/USDT", "ETH/USDT"]
+tflist = ["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"]
+
+symbol = "BTC/USDT"
+tf = "1m"
 
 
 async def main():
-    bot = Download_Candle("BTC/USDT", "1d")
-    df = await bot.fetching_candle()
-    print(df.tail())
-    # print(await bot.fetching_candle())
+    df = await downloadCandle(symbol, tf)
+    print(df)
+    df.to_csv(f"data/{symbol.replace('/','')}_{tf}.csv")
+    candle(df, symbol, tf)
 
 
 if __name__ == "__main__":
