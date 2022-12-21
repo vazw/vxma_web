@@ -30,7 +30,13 @@ from dash import (
 from dash.dependencies import Input, Output, State
 from dash.exceptions import PreventUpdate
 
-from vxma_d.AppData.Appdata import BOTCOL, bot_setting, cooking, perf
+from vxma_d.AppData.Appdata import (
+    BOTCOL,
+    bot_setting,
+    cooking,
+    notify_send,
+    perf,
+)
 from vxma_d.Strategy.ematalib import EMA_CROSS as EMA
 
 try:
@@ -87,7 +93,7 @@ logging.basicConfig(
 )
 
 
-insession = dict(name=False, day=False, hour=False)
+websession = dict(name=False, day=False, hour=False)
 # STAT setting
 barsC = 1502
 msg = ""
@@ -1059,11 +1065,11 @@ app.layout = dmc.MantineProvider(
 # #logout button
 @app.callback(Output("loading", "children"), Input("logoutBut", "n_clicks"))
 def logout(click):
-    if click is not None and insession["name"]:
-        insession["name"] = False
+    if click is not None and websession["name"]:
+        websession["name"] = False
         return "loged In"
     elif click is not None:
-        insession["name"] = False
+        websession["name"] = False
         return "loged Out"
     else:
         return ""
@@ -1085,9 +1091,9 @@ def update_output(n_clicks, uname, passw):
     elif uname != li:
         return "Incorrect Username"
     elif perf(uname, passw):
-        insession["name"] = True
+        websession["name"] = True
         return "Loged-In"
-    elif insession["name"]:
+    elif websession["name"]:
         return "Already Loged in"
     else:
         return "Incorrect Password"
@@ -1098,13 +1104,13 @@ def update_output(n_clicks, uname, passw):
     Output("page-content-login", "children"), Input("url", "pathname")
 )
 def pathname_page(pathname):
-    if pathname == "/index" and insession["name"]:
+    if pathname == "/index" and websession["name"]:
         return index_page
-    elif pathname == "/" and insession["name"]:
+    elif pathname == "/" and websession["name"]:
         return index_page
-    elif pathname == "/" and not insession["name"]:
+    elif pathname == "/" and not websession["name"]:
         return login_page
-    elif not insession["name"]:
+    elif not websession["name"]:
         return login_page
     else:
         return "Code : 404"
@@ -1487,7 +1493,7 @@ def excuteBot(
                     pd.Series(compo, index=BOTCOL), ignore_index=True
                 )
                 data.to_csv("bot_config.csv", index=False)
-                # notify.send("Setting บอทเรียบร้อย บอทกำลังทำงาน!")
+                notify_send("Setting บอทเรียบร้อย บอทกำลังทำงาน!")
                 return [
                     dbc.Alert(
                         "Success.",
@@ -1570,7 +1576,7 @@ def setting(click, freeB, minB, api_key, apiZ, notifykey, pwd, ready):
                         index_label="apikey",
                     )
                     con.commit()
-                # notify.send("Setting API update")
+                notify_send("Setting API update")
                 return [
                     dbc.Alert(
                         "Success.",
@@ -1635,7 +1641,7 @@ def resetpwd(click, pwd1, pwd2, id):
                         index_label="id",
                     )
                     con.commit()
-                # notify.send("Setting รหัสผ่านสำเร็จ")
+                notify_send("Setting รหัสผ่านสำเร็จ")
                 return [
                     dbc.Alert(
                         "Success.",
