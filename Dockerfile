@@ -6,18 +6,14 @@ COPY requirements.txt requirements.txt
 
 RUN python3 -m pip install -r requirements.txt --no-clean
 
-RUN ls
-
-# EXPOSE 8000
+EXPOSE 8050
 
 COPY . .
 
-# CMD ["python", "app.py"]
-#ENTRYPOINT [ "production_script.sh" ]
 # copy files
 COPY app.py ./
 COPY web_app.py ./
-
+COPY run.sh ./
+HEALTHCHECK CMD ["bash", "run.sh"]
 # run app
-CMD ["gunicorn", "--bind", "0.0.0.0:8050", "web_app:server"]
-CMD ["python", "app.py"]
+CMD ["bash", "run.sh"]
