@@ -318,14 +318,14 @@ RISK_input = dmc.TextInput(
     label="RISK($,%)",
     style={"width": 75},
     id="Risk-input",
-    value="$3",
+    value="$1",
     type="text",
 )
 Margin_input = dmc.TextInput(
     label="MaxMargin",
     style={"width": 75},
     id="maxmargin-input",
-    value="%1",
+    value="%5",
     type="text",
 )
 

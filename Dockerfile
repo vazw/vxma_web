@@ -10,6 +10,5 @@ EXPOSE 8050
 
 COPY . .
 
-HEALTHCHECK CMD ["bash", "run.sh"]
 # run app
 CMD ["bash", "run.sh"]
