@@ -168,7 +168,6 @@ def makepairlist():
 
 # HTML COMPONENT
 option_input = dmc.Group(
-    direction="column",
     children=[
         dmc.Checkbox(label="Long", size="xs", checked=True, id="Long-input"),
         dmc.Checkbox(label="Short", size="xs", checked=True, id="Short-input"),
@@ -562,70 +561,6 @@ login_page = dmc.Center(
     ]
 )
 
-index_page = dmc.MantineProvider(
-    [
-        dmc.Header(
-            height=70,
-            fixed=False,
-            children=[
-                dmc.Container(
-                    fluid=True,
-                    children=dmc.Group(
-                        position="apart",
-                        align="flex-start",
-                        children=[
-                            dmc.Center(
-                                dcc.Link(
-                                    [html.H2("VXMA BOT")],
-                                    href="/index",
-                                    refresh=True,
-                                    style={
-                                        "paddingTop": 5,
-                                        "textDecoration": "none",
-                                    },
-                                ),
-                            ),
-                            dmc.Group(
-                                position="right",
-                                align="flex-end",
-                                children=[
-                                    dmc.Center(
-                                        [
-                                            dcc.Interval(
-                                                id="session", interval=900000
-                                            ),
-                                            html.Div(id="loading"),
-                                            logoutBut,
-                                        ]
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                )
-            ],
-        ),
-        dmc.Tabs(
-            active=0,
-            color="green",
-            id="tabs-one",
-            grow=False,
-            position="right",
-            orientation="horizontal",
-            children=[
-                dmc.Tab(label="Summary"),
-                dmc.Tab(label="VXMA bot"),
-                dmc.Tab(label="EMA bot"),
-                dmc.Tab(label="Running Bot"),
-                dmc.Tab(label="Setting"),
-            ],
-        ),
-        dmc.Center(id="page-content-tabs"),
-    ],
-    theme={"colorScheme": "dark"},
-    id="theme",
-    styles={"height": "100%", "width": "98%"},
-)
 
 Summary_page = dmc.Container(
     [
@@ -1039,6 +974,78 @@ Setting_page = dmc.Container(
     ]
 )
 
+index_page = dmc.MantineProvider(
+    [
+        dmc.Header(
+            height=70,
+            fixed=False,
+            children=[
+                dmc.Container(
+                    fluid=True,
+                    children=dmc.Group(
+                        position="apart",
+                        align="flex-start",
+                        children=[
+                            dmc.Center(
+                                dcc.Link(
+                                    [html.H2("VXMA BOT")],
+                                    href="/index",
+                                    refresh=True,
+                                    style={
+                                        "paddingTop": 5,
+                                        "textDecoration": "none",
+                                    },
+                                ),
+                            ),
+                            dmc.Group(
+                                position="right",
+                                align="flex-end",
+                                children=[
+                                    dmc.Center(
+                                        [
+                                            dcc.Interval(
+                                                id="session", interval=900000
+                                            ),
+                                            html.Div(id="loading"),
+                                            logoutBut,
+                                        ]
+                                    ),
+                                ],
+                            ),
+                        ],
+                    ),
+                )
+            ],
+        ),
+        dmc.Tabs(
+            value="sumarry",
+            color="green",
+            id="tabs-one",
+            orientation="horizontal",
+            children=[
+                dmc.TabsList(
+                    [
+                        dmc.Tab("Summary", value="sumarry"),
+                        dmc.Tab("VXMA bot", value="vxma"),
+                        dmc.Tab("EMA bot", value="ema"),
+                        dmc.Tab("Running Bot", value="running"),
+                        dmc.Tab("Setting", value="setting"),
+                    ],
+                    grow=False,
+                    position="right",
+                ),
+                dmc.TabsPanel(Summary_page, value="sumarry"),
+                dmc.TabsPanel(vxma_page, value="vxma"),
+                dmc.TabsPanel(EMA_page, value="ema"),
+                dmc.TabsPanel(RunningBot_page, value="running"),
+                dmc.TabsPanel(Setting_page, value="setting"),
+            ],
+        ),
+    ],
+    theme={"colorScheme": "dark"},
+    id="theme",
+    withGlobalStyles={"height": "100%", "width": "98%"},
+)
 
 # creates the Dash App
 app = Dash(
@@ -1058,7 +1065,7 @@ app.layout = dmc.MantineProvider(
     ],
     theme={"colorScheme": "dark"},
     id="theme",
-    styles={"height": "100%", "width": "98%"},
+    withGlobalStyles={"height": "100%", "width": "98%"},
 )
 
 
@@ -1114,22 +1121,6 @@ def pathname_page(pathname):
         return login_page
     else:
         return "Code : 404"
-
-
-@app.callback(
-    Output("page-content-tabs", "children"), Input("tabs-one", "active")
-)
-def tabs(tabs):
-    if tabs == 1:
-        return vxma_page
-    elif tabs == 2:
-        return EMA_page
-    elif tabs == 3:
-        return RunningBot_page
-    elif tabs == 4:
-        return Setting_page
-    else:
-        return Summary_page
 
 
 # VXMA strategy
