@@ -19,6 +19,5 @@ COPY app.py ./
 COPY web_app.py ./
 
 # run app
+CMD ["gunicorn", "--bind", "0.0.0.0:8050", "web_app:server"]
 CMD ["python", "app.py"]
-CMD ["python", "web_app.py"]
-# CMD ["gunicorn", "--bind", "0.0.0.0:8050", "web_app:app"]
