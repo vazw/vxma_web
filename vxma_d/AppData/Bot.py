@@ -15,11 +15,14 @@ from uuid import uuid4
 import mplfinance as mplf
 import pandas as pd
 
+from vxma_d.AppData import colorCS
 from vxma_d.AppData.Appdata import (
+    AppConfig,
     RiskManageTable,
     TATable,
     bot_setting,
     candle,
+    clearconsol,
     notify_send,
 )
 from vxma_d.MarketEX.CCXT_Binance import (
@@ -36,10 +39,11 @@ try:
 except Exception as e:
     from vxma_d.Strategy.vxma_pandas_ta import vxma as ta
 
+bot_name = "VXMA Trading Bot by Vaz.(0.1.1)"
+
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
 warnings.filterwarnings("ignore")
-
 
 logging.basicConfig(
     filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
@@ -112,11 +116,9 @@ s = mplf.make_mpf_style(
 
 async def bot_1(symbol, ta_data, tf):
     try:
-        print("Bot 1 is running...")
         data1 = await fetchbars(symbol, tf)
         bot1 = ta(data1, ta_data)
         data1 = bot1.indicator()
-        print("Bot 1 is Done!")
         return data1
     except Exception as e:
         print(e)
@@ -125,11 +127,9 @@ async def bot_1(symbol, ta_data, tf):
 
 async def bot_2(symbol, ta_data, tf):
     try:
-        print("Bot 2 is running...")
         data2 = await fetchbars(symbol, tf)
         bot2 = ta(data2, ta_data)
         data2 = bot2.indicator()
-        print("Bot 2 is Done!")
         return data2
     except Exception as e:
         print(e)
@@ -138,11 +138,9 @@ async def bot_2(symbol, ta_data, tf):
 
 async def bot_3(symbol, ta_data, tf):
     try:
-        print("Bot 3 is running...")
         data3 = await fetchbars(symbol, tf)
         bot3 = ta(data3, ta_data)
         data3 = bot3.indicator()
-        print("Bot 3 is Done!")
         return data3
     except Exception as e:
         print(e)
@@ -162,10 +160,10 @@ async def get_dailytasks():
                 bot_3(symbol, ta_data.__dict__, "1h"),
             )
 
-            # candle(df1, symbol, "1d")
             # candle(df2, symbol, "6h")
             # candle(df3, symbol, "1h")
             if df1 is not None:
+                candle(df1, symbol, "1d")
                 long_term = ta_score(df1)
                 mid_term = ta_score(df2)
                 short_term = ta_score(df3)
@@ -185,8 +183,8 @@ async def get_dailytasks():
             pass
 
 
-def remove_last_line_from_string(s):
-    return s[: s.rfind("\n")]
+def remove_last_line_from_string(text):
+    return text[: text.rfind("\n")]
 
 
 async def dailyreport():
@@ -236,10 +234,10 @@ async def dailyreport():
         status = status.sort_values(by=["unrealizedProfit"], ascending=False)
         status = status.head(1)
         print(status)
-        sim1 = status["symbol"][1]
-        upnl = round(float(status["unrealizedProfit"][1]), 2)
-        entryP = status["entryPrice"][1]
-        metthod = status["positionSide"][1]
+        sim1 = status["symbol"][0]
+        upnl = round(float(status["unrealizedProfit"][0]), 2)
+        entryP = status["entryPrice"][0]
+        metthod = status["positionSide"][0]
         msg2 = f"{sim1} {metthod} at {entryP} \nunrealizedProfit : {upnl}$"
         message = (
             f"Top Performance\n{msg2}\n-----\n"
@@ -307,19 +305,118 @@ async def running_module():
                     ta_table_data.__dict__,
                     risk_manage_data.timeframe,
                 )
-                await asyncio.gather(feed(data, risk_manage_data.__dict__))
+                try:
+                    balance = await exchange.fetch_balance()
+                except Exception as e:
+                    print(e)
+                    await disconnect(exchange)
+
+                    logging.info(e)
+                    exchange = await connect()
+                    balance = await exchange.fetch_balance({"type": "future"})
+                positions = balance["info"]["positions"]
+                current_positions = [
+                    position
+                    for position in positions
+                    if float(position["positionAmt"]) != 0
+                ]
+                status = pd.DataFrame(
+                    current_positions,
+                    columns=[
+                        "symbol",
+                        "entryPrice",
+                        "positionSide",
+                        "unrealizedProfit",
+                        "positionAmt",
+                        "initialMargin",
+                        "leverage",
+                    ],
+                )
+                margin = 0.0
+                netunpl = 0.0
+                config = AppConfig()
+                max_margin = config.max_margin
+                min_balance = config.min_balance
+                for i in status.index:
+                    margin += float(status["initialMargin"][i])
+                    netunpl += float(status["unrealizedProfit"][i])
+                if margin > max_margin:
+                    notify_send(
+                        "Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
+                        f"ที่กำหนดไว้ : {max_margin}",
+                        sticker=17857,
+                        package=1070,
+                    )
+                    return
+                await asyncio.gather(
+                    feed(
+                        data,
+                        risk_manage_data.__dict__,
+                        balance,
+                        min_balance,
+                        status,
+                    )
+                )
 
             except Exception as e:
                 print(e)
                 pass
+        clearconsol()
+        print(f"{bot_name}")
+        print(str(status.head(len(status.index))))
+        print(f"Margin Used : {round(margin, 2)}$")
+        print(f"NET unrealizedProfit : {round(netunpl, 2)}$")
         await asyncio.sleep(1)
-        print("Bot is running...")
     else:
         await asyncio.sleep(60)
         print("Nothing to do now.....")
 
 
+async def waiting():
+    count = 0
+    status = [
+        "⠋ Running.",
+        "⠙ Running..",
+        "⠹ Running...",
+        "⠸ Running....",
+        "⠼ Running.....",
+        "⠴ Running-",
+        "⠦ Running--",
+        "⠧ Running---",
+        "⠇ Running----",
+        "⠏ Running-----",
+    ]
+    while True:
+        await asyncio.sleep(0.5)
+        print(
+            "\r"
+            + colorCS.CRED
+            + colorCS.CBOLD
+            + status[count % len(status)]
+            + "\r"
+            + colorCS.CEND,
+            end="",
+        )
+        count += 1
+        count = count % len(status)
+
+
+async def warper_fn():
+    while True:
+        try:
+            await running_module()
+        except Exception as e:
+            print(e)
+            logging.INFO(e)
+            notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
+            await asyncio.sleep(3600)
+
+
 async def run_bot():
-    await asyncio.gather(running_module())
-    await asyncio.sleep(30)
-    # await asyncio.gather(dailyreport())
+    try:
+        await asyncio.gather(warper_fn(), waiting())
+        # await asyncio.gather(dailyreport(), waiting())
+    except Exception as e:
+        logging.INFO(e)
+        notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
+        await asyncio.sleep(3600)

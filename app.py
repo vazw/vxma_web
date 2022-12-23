@@ -9,13 +9,24 @@
 
 import asyncio
 
-from vxma_d.AppData import Bot
+from vxma_d.AppData import Bot, colorCS
+
+my_message = (
+    f"\r{colorCS.CRED}{colorCS.CBOLD}ก่อนที่เราจะเทรด Futures\n"
+    + "เราต้องเข้าใจไว้ก่อนว่าเงินนั้นมันอาจจะหมดเป็นศูนย์ได้เลย\n"
+    + "หากเราเข้าใจตามนี้แล้วความเสี่ยงทั้งหมดของเงินลงทุนจะเท่ากับ"
+    + f"Risk 1 : Reward infinity เสมอ{colorCS.CEND}"
+)
 
 
 def main():
     while True:
-        asyncio.run(Bot.run_bot())
+        try:
+            asyncio.run(Bot.run_bot())
+        except KeyboardInterrupt:
+            return print(my_message)
 
 
 if __name__ == "__main__":
+    print("Starting VXMA Bot Trading by Vaz")
     main()

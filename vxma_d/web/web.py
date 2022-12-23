@@ -75,18 +75,6 @@ else:
 # notify = LineNotify(LINE_TOKEN)
 
 
-def clearconsol():
-    try:
-        if os.name == "posix":
-            os.system("clear")
-        else:
-            os.system("cls")
-        return
-    except Exception as e:
-        print(e)
-        return
-
-
 logging.basicConfig(
     filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
 )

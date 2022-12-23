@@ -99,8 +99,6 @@ async def get_symbol():
 
 
 async def fetchbars(symbol, timeframe):
-    mess = symbol, timeframe, dt.now().isoformat()
-    print(f"Benchmarking new bars for {mess}")
     exchange = await connect()
     try:
         bars = await exchange.fetch_ohlcv(
@@ -724,52 +722,21 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
     return
 
 
-async def feed(df, risk_manage):
+async def feed(
+    df,
+    risk_manage,
+    balance,
+    min_balance,
+    status,
+):
     is_in_Long = False
     is_in_Short = False
     is_in_position = False
+    amt = 0.0
+    upnl = 0.0
     posim = risk_manage["symbol"].replace("/", "")
     exchange = await connect()
     try:
-        balance = await exchange.fetch_balance()
-    except Exception as e:
-        print(e)
-        await disconnect(exchange)
-
-        logging.info(e)
-        exchange = await connect()
-        balance = await exchange.fetch_balance({"type": "future"})
-    positions = balance["info"]["positions"]
-    current_positions = [
-        position
-        for position in positions
-        if float(position["positionAmt"]) != 0
-    ]
-    status = pd.DataFrame(
-        current_positions,
-        columns=[
-            "symbol",
-            "entryPrice",
-            "positionSide",
-            "unrealizedProfit",
-            "positionAmt",
-            "initialMargin",
-            "leverage",
-        ],
-    )
-    amt = 0.0
-    upnl = 0.0
-    margin = 0.0
-    netunpl = 0.0
-    config = AppConfig()
-    max_margin = config.max_margin
-    min_balance = config.min_balance
-    for i in status.index:
-        margin += float(status["initialMargin"][i])
-        netunpl += float(status["unrealizedProfit"][i])
-    print(f"Margin Used : {margin}")
-    print(f"NET unrealizedProfit : {netunpl}")
-    try:
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
     except Exception as e:
         print(e)
@@ -778,13 +745,6 @@ async def feed(df, risk_manage):
         logging.info(e)
         exchange = await connect()
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
-    if margin > max_margin:
-        notify_send(
-            "Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
-            f"ที่กำหนดไว้ : {max_margin}",
-            sticker=17857,
-            package=1070,
-        )
     for i in status.index:
         if status["symbol"][i] == posim:
             amt = float(status["positionAmt"][i])

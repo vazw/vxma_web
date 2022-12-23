@@ -142,6 +142,20 @@ class RiskManageTable:
         return True if str(arg).lower() == "true" else False
 
 
+# ansi escape code
+@dataclass
+class ColorCS:
+    CLS_SCREEN: str = "\033[2J\033[1;1H"  # cls + set top left
+    CLS_LINE: str = "\033[0J"
+    SHOW_CURSOR: str = "\033[?25h"
+    HIDE_CURSOR: str = "\033[?25l"
+    CRED: str = "\33[31m"
+    CGREEN: str = "\33[32m"
+    CYELLOW: str = "\33[33m"
+    CEND: str = "\033[0m"
+    CBOLD: str = "\33[1m"
+
+
 @dataclass
 class TATable:
     atr_p: int = 12
@@ -249,3 +263,15 @@ def candle(df, symbol, tf):
             xrotation=20,
         )
     return notify_send(f"info : {titles}", image_path=("./candle.png"))
+
+
+def clearconsol():
+    try:
+        if os.name == "posix":
+            os.system("clear")
+        else:
+            os.system("cls")
+        return
+    except Exception as e:
+        print(e)
+        return
