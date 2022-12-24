@@ -12,10 +12,11 @@ import asyncio
 from vxma_d.AppData import Bot, colorCS
 
 my_message = (
-    f"\r{colorCS.CRED}{colorCS.CBOLD}ก่อนที่เราจะเทรด Futures\n"
+    f"\r{colorCS.CRED}{colorCS.CBOLD}\nก่อนที่เราจะเทรด Futures\n"
     + "เราต้องเข้าใจไว้ก่อนว่าเงินนั้นมันอาจจะหมดเป็นศูนย์ได้เลย\n"
     + "หากเราเข้าใจตามนี้แล้วความเสี่ยงทั้งหมดของเงินลงทุนจะเท่ากับ"
     + f"Risk 1 : Reward infinity เสมอ{colorCS.CEND}"
+    + "\nขอให้โชคดี!"
 )
 
 
