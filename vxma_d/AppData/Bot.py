@@ -364,15 +364,19 @@ async def running_module():
                 print(e)
                 pass
         clearconsol()
-        print(f"{bot_name}")
+        print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
         print(
             status.to_string(index=False)
             if not status.empty
             else "NO POSITION"
         )
-        print(f"Margin Used : {round(margin, 2)}$")
-        print(f"NET unrealizedProfit : {round(netunpl, 2)}$")
-        await asyncio.sleep(1)
+        print(
+            f"Margin Used : {colorCS.CRED}{round(margin, 2)} ${colorCS.CEND}"
+        )
+        print(
+            f"NET unrealizedProfit : {colorCS.CGREEN}{round(netunpl, 2)} ${colorCS.CEND}"  # noqa:
+        )
+        await asyncio.sleep(30)
     else:
         await asyncio.sleep(60)
         print("Nothing to do now.....")
@@ -381,27 +385,27 @@ async def running_module():
 async def waiting():
     count = 0
     status = [
-        "⠋ ",
-        "⠙ ",
-        "⠹ ",
-        "⠸ ",
-        "⠼ ",
-        "⠴ ",
-        "⠦ ",
-        "⠧ ",
-        "⠇ ",
-        "⠏ ",
+        "\\ Latest",
+        "- lAtest",
+        "/ laTest",
+        "- latEst",
+        "\\ lateSt",
+        "- latesT",
+        "/ latest",
+        "- latest",
     ]
     while True:
-        await asyncio.sleep(0.5)
+        await asyncio.sleep(0.2)
         print(
             "\r"
             + colorCS.CRED
             + colorCS.CBOLD
             + status[count % len(status)]
-            + "Latest update : "
+            + f" update : {colorCS.CGREEN}"
             + f"{(lastUpdate.candle)[:-10].replace('T',' เวลา ')}"
-            + f" Balance : {lastUpdate.balance} USDT\r"
+            + colorCS.CRED
+            + f" Balance : {colorCS.CGREEN}{lastUpdate.balance}"
+            + f"{colorCS.CRED} $\r"
             + colorCS.CEND,
             end="",
         )

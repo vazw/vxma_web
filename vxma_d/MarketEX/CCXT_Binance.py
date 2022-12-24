@@ -31,7 +31,7 @@ def callbackRate(data):
 def RRTP(df, direction, step, price, TPRR1, TPRR2):
     m = len(df.index)
     if direction:
-        low = float(df["Lowest"][m - 1])
+        low = float(df["lowest"][m - 1])
         if step == 1:
             target = price * (1 + ((price - low) / price) * float(TPRR1))
             return float(target)
@@ -39,7 +39,7 @@ def RRTP(df, direction, step, price, TPRR1, TPRR2):
             target = price * (1 + ((price - low) / price) * float(TPRR2))
             return float(target)
     else:
-        high = float(df["Highest"][m - 1])
+        high = float(df["highest"][m - 1])
         if step == 1:
             target = price * (1 - ((high - price) / price) * float(TPRR1))
             return float(target)
@@ -59,6 +59,9 @@ async def disconnect(exchange):
 
 
 async def get_symbol():
+    """
+    get top 10 volume symbol of the day
+    """
     symbols = pd.DataFrame()
     symbolist = bot_setting()
     print("fecthing Symbol of Top 10 Volume...")
@@ -99,7 +102,53 @@ async def get_symbol():
     return newsym
 
 
+async def getAllsymbol():
+    """
+    get top 10 volume symbol of the day
+    """
+    symbols = pd.DataFrame()
+    symbolist = bot_setting()
+    print("fecthing Symbol of Top 10 Volume...")
+    exchange = await connect()
+    try:
+        market = await exchange.fetch_tickers(params={"type": "future"})
+    except Exception as e:
+        print(e)
+        await disconnect(exchange)
+
+        logging.info(e)
+        exchange = await connect()
+        market = await exchange.fetch_tickers(params={"type": "future"})
+    await disconnect(exchange)
+    for x, y in market.items():
+        if y["symbol"][len(y["symbol"]) - 4 : len(y["symbol"])] == "USDT":
+            symbols = symbols.append(y, ignore_index=True)
+    symbols = symbols.set_index("symbol")
+    symbols["datetime"] = pd.to_datetime(
+        symbols["timestamp"], unit="ms", utc=True
+    ).map(lambda x: x.tz_convert("Asia/Bangkok"))
+    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
+    symbols.drop(["timestamp", "high", "low", "average"], axis=1, inplace=True)
+    symbols.drop(
+        ["bid", "bidVolume", "ask", "askVolume"], axis=1, inplace=True
+    )
+    symbols.drop(["vwap", "open", "baseVolume", "info"], axis=1, inplace=True)
+    symbols.drop(["close", "previousClose", "datetime"], axis=1, inplace=True)
+    newsym = []
+    if len(symbolist.index) > 0:
+        for i in range(len(symbolist.index)):
+            newsym.append(symbolist["symbol"][i])
+    for symbol in symbols.index:
+        newsym.append(symbol)
+    newsym = list(dict.fromkeys(newsym))
+    print(f"Interested : {newsym}")
+    return newsym
+
+
 async def fetchbars(symbol, timeframe):
+    """
+    get candle from exchange
+    """
     exchange = await connect()
     try:
         bars = await exchange.fetch_ohlcv(
@@ -150,11 +199,11 @@ async def setleverage(symbol, lev, exchange):
 def RR1(df, side, price):
     m = len(df.index)
     if side == "buy":
-        low = df["Lowest"][m - 1]
+        low = df["lowest"][m - 1]
         target = price * (1 + ((price - float(low)) / price) * 1)
         return target
     elif side == "sell":
-        high = df["Highest"][m - 1]
+        high = df["highest"][m - 1]
         target = price * (1 - ((float(high) - price) / price) * 1)
         return target
     else:
@@ -351,7 +400,7 @@ async def USETPLONG(
 def buysize(df, balance, symbol, exchange, RISK):
     last = len(df.index) - 1
     freeusd = float(balance["free"]["USDT"])
-    low = float(df["Lowest"][last])
+    low = float(df["lowest"][last])
     if RISK[0] == "$":
         risk = float(RISK[1 : len(RISK)])
     elif RISK[0] == "%":
@@ -368,7 +417,7 @@ def buysize(df, balance, symbol, exchange, RISK):
 def sellsize(df, balance, symbol, exchange, RISK):
     last = len(df.index) - 1
     freeusd = float(balance["free"]["USDT"])
-    high = float(df["Highest"][last])
+    high = float(df["highest"][last])
     if RISK[0] == "$":
         risk = float(RISK[1 : len(RISK)])
     elif RISK[0] == "%":
@@ -559,7 +608,7 @@ async def OpenShort(df, balance, risk_manage, currentMODE, Sside, min_balance):
         free = float(balance["free"]["USDT"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
         amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
-        high = df["Highest"][len(df.index) - 1]
+        high = df["highest"][len(df.index) - 1]
         if free > min_balance:
             try:
                 order = await exchange.create_market_order(
@@ -738,6 +787,7 @@ async def feed(
     upnl = 0.0
     posim = risk_manage["symbol"].replace("/", "")
     exchange = await connect()
+    exchange.load_markets()
     try:
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
     except Exception as e:
@@ -774,7 +824,6 @@ async def feed(
         is_in_Short = False
         is_in_Long = False
     last = len(df.index) - 1
-    await disconnect(exchange)
     if df["BUY"][last] == 1:
         print("changed to Bullish, buy")
         if is_in_Short:
@@ -788,6 +837,19 @@ async def feed(
                 Sside,
                 risk_manage["timeframe"],
             )
+            if risk_manage["use_long"]:
+                await exchange.cancel_all_orders(risk_manage["symbol"])
+                await OpenLong(
+                    df,
+                    balance,
+                    risk_manage,
+                    currentMODE,
+                    Lside,
+                    min_balance,
+                )
+            else:
+                print("No permission for excute order : Do nothing")
+
         elif not is_in_Long and risk_manage["use_long"]:
             await exchange.cancel_all_orders(risk_manage["symbol"])
             await OpenLong(
@@ -813,6 +875,18 @@ async def feed(
                 Lside,
                 risk_manage["timeframe"],
             )
+            if risk_manage["use_short"]:
+                await exchange.cancel_all_orders(risk_manage["symbol"])
+                await OpenShort(
+                    df,
+                    balance,
+                    risk_manage,
+                    currentMODE,
+                    Sside,
+                    min_balance,
+                )
+            else:
+                print("No permission for excute order : Do nothing")
         elif not is_in_Short and risk_manage["use_short"]:
             await exchange.cancel_all_orders(risk_manage["symbol"])
             await OpenShort(
@@ -825,3 +899,4 @@ async def feed(
             )
         else:
             print("already in position, nothing to do")
+    await disconnect(exchange)

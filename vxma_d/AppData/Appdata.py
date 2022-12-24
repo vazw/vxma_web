@@ -119,8 +119,8 @@ def max_margin_size(size, free_balance) -> float:
 class RiskManageTable:
     def __init__(self, symbolist, col_index, free_balance):
         self.symbol = symbolist["symbol"][col_index]
-        if self.symbol[0:4] == "1000":
-            self.symbol = self.symbol[4 : len(self.symbol)]
+        # if self.symbol[0:4] == "1000":
+        #     self.symbol = self.symbol[4 : len(self.symbol)]
         self.timeframe = symbolist["timeframe"][col_index]
         self.use_long = self.check_bool(symbolist["Uselong"][col_index])
         self.use_short = self.check_bool(symbolist["Useshort"][col_index])

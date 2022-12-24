@@ -39,7 +39,7 @@ from vxma_d.AppData.Appdata import (
 )
 
 try:
-    from vxma_d.Strategy.vxmatalib import vxma as indi
+    from vxma_d.Strategy.vxma_talib import vxma as indi
 except Exception as e:
     print(e)
     from vxma_d.Strategy.vxma_pandas_ta import vxma as indi
@@ -122,7 +122,13 @@ TIMEFRAMES_DICT = {
 }
 
 
-nomEX = ccxt.binance()
+nomEX = ccxt.binance(
+    {
+        "options": {"defaultType": "future"},
+        "enableRateLimit": True,
+        "adjustForTimeDifference": True,
+    }
+)
 
 
 def makepairlist():
@@ -502,7 +508,7 @@ readyAPI_input = dmc.Switch(
     id="readyAPI-input",
 )
 
-refresher_i = dcc.Interval(id="update", interval=10000)
+refresher_i = dcc.Interval(id="update", interval=5000)
 
 
 login_page = dmc.Center(
@@ -858,7 +864,7 @@ RunningBot_page = dmc.Container(
             grow=True,
         ),
         html.Hr(),
-        dbc.Row([dmc.Center(id="datatable")]),
+        dbc.Row([dmc.Center([dmc.Table(id="datatable")])]),
         html.Hr(),
         dbc.Row(
             [
