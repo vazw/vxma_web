@@ -5,6 +5,7 @@ from datetime import datetime as dt
 import ccxt.async_support as ccxt
 import pandas as pd
 
+from vxma_d.AppData import lastUpdate
 from vxma_d.AppData.Appdata import AppConfig, bot_setting, candle, notify_send
 
 barsC = 1502
@@ -122,6 +123,7 @@ async def fetchbars(symbol, timeframe):
         lambda x: x.tz_convert("Asia/Bangkok")
     )
     df = df.set_index("timestamp")
+    lastUpdate.candle = f"{dt.now().isoformat()}"
     return df
 
 

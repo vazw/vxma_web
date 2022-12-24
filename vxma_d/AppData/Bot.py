@@ -15,7 +15,7 @@ from uuid import uuid4
 import mplfinance as mplf
 import pandas as pd
 
-from vxma_d.AppData import colorCS
+from vxma_d.AppData import colorCS, lastUpdate
 from vxma_d.AppData.Appdata import (
     AppConfig,
     RiskManageTable,
@@ -39,7 +39,7 @@ try:
 except Exception as e:
     from vxma_d.Strategy.vxma_pandas_ta import vxma as ta
 
-bot_name = "VXMA Trading Bot by Vaz.(0.1.1)"
+bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.1) github.com/vazw/vxma_web"
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -285,6 +285,7 @@ async def running_module():
             notify_send(msg, sticker=10863, package=789)
             insession["hour"] = True
         free_balance = float(balance["free"]["USDT"])
+        lastUpdate.balance = round(float(balance["total"]["USDT"]), 2)
         await disconnect(exchange)
         for i in symbolist.index:
             try:
@@ -348,6 +349,7 @@ async def running_module():
                         package=1070,
                     )
                     return
+                await asyncio.sleep(exchange.rateLimit / 1000)
                 await asyncio.gather(
                     feed(
                         data,
@@ -363,7 +365,11 @@ async def running_module():
                 pass
         clearconsol()
         print(f"{bot_name}")
-        print(str(status.head(len(status.index))))
+        print(
+            status.to_string(index=False)
+            if not status.empty
+            else "NO POSITION"
+        )
         print(f"Margin Used : {round(margin, 2)}$")
         print(f"NET unrealizedProfit : {round(netunpl, 2)}$")
         await asyncio.sleep(1)
@@ -375,16 +381,16 @@ async def running_module():
 async def waiting():
     count = 0
     status = [
-        "⠋ Running.",
-        "⠙ Running..",
-        "⠹ Running...",
-        "⠸ Running....",
-        "⠼ Running.....",
-        "⠴ Running-",
-        "⠦ Running--",
-        "⠧ Running---",
-        "⠇ Running----",
-        "⠏ Running-----",
+        "⠋ ",
+        "⠙ ",
+        "⠹ ",
+        "⠸ ",
+        "⠼ ",
+        "⠴ ",
+        "⠦ ",
+        "⠧ ",
+        "⠇ ",
+        "⠏ ",
     ]
     while True:
         await asyncio.sleep(0.5)
@@ -393,7 +399,9 @@ async def waiting():
             + colorCS.CRED
             + colorCS.CBOLD
             + status[count % len(status)]
-            + "\r"
+            + "Latest update : "
+            + f"{(lastUpdate.candle)[:-10].replace('T',' เวลา ')}"
+            + f" Balance : {lastUpdate.balance} USDT\r"
             + colorCS.CEND,
             end="",
         )
@@ -407,7 +415,7 @@ async def warper_fn():
             await running_module()
         except Exception as e:
             print(e)
-            logging.INFO(e)
+            logging.info(e)
             notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
             await asyncio.sleep(3600)
 
@@ -417,6 +425,6 @@ async def run_bot():
         await asyncio.gather(warper_fn(), waiting())
         # await asyncio.gather(dailyreport(), waiting())
     except Exception as e:
-        logging.INFO(e)
+        logging.info(e)
         notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
         await asyncio.sleep(3600)

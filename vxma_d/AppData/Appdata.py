@@ -31,13 +31,13 @@ rcs = {
 }
 
 
-color = mplf.make_marketcolors(
+colors_candle = mplf.make_marketcolors(
     up="white", down="black", wick="black", edge="black"
 )
-s = mplf.make_mpf_style(
+style_candle = mplf.make_mpf_style(
     rc=rcs,
     y_on_right=True,
-    marketcolors=color,
+    marketcolors=colors_candle,
     figcolor="white",
     gridaxis="horizontal",
 )
@@ -142,6 +142,12 @@ class RiskManageTable:
         return True if str(arg).lower() == "true" else False
 
 
+@dataclass
+class Last_update:
+    candle: str = "T -- ----------"
+    balance: str = "--"
+
+
 # ansi escape code
 @dataclass
 class ColorCS:
@@ -240,7 +246,7 @@ def candle(df, symbol, tf):
             type="candle",
             title=titles,
             addplot=[vxma, buy, sell],
-            style=s,
+            style=style_candle,
             volume=True,
             savefig="candle.png",
             tight_layout=True,
@@ -254,7 +260,7 @@ def candle(df, symbol, tf):
             data,
             type="candle",
             title=titles,
-            style=s,
+            style=style_candle,
             volume=True,
             savefig="candle.png",
             tight_layout=True,
