@@ -81,7 +81,7 @@ class vxma:
     def swing_low(self):
         """calculate swing low price with given data"""
         df = self.data
-        lowest = df["low"]
+        lowest = df["low"].copy()
         for i in range(self.length - self.pivot, self.length):
             if df["low"][i] < lowest[i - 1]:
                 lowest[i] = df["low"][i]
@@ -92,7 +92,7 @@ class vxma:
     def swing_high(self):
         """calculate swing high price with given data"""
         df = self.data
-        highest = df["high"]
+        highest = df["high"].copy()
         for i in range(self.length - self.pivot, self.length):
             if df["high"][i] > highest[i - 1]:
                 highest[i] = df["high"][i]
