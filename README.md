@@ -40,3 +40,47 @@ password = 'vxmaBot'
 2. any improvement or pointing some issues are welcome! 😁
 3. I need your help 🙏
 
+### Structure
+```
+vxma_web/
+├── vxma_d
+│   ├── AppData
+│   │   ├── Appdata.py
+│   │   ├── Bot.py
+│   │   ├── __init__.py
+│   │   ├── oldutil
+│   │   └── ResetDatabase.py
+│   ├── Backtesting
+│   │   ├── Candle_ohlc.py
+│   │   └── __init__.py
+│   ├── MarketEX
+│   │   ├── CCXT_Binance.py
+│   │   └── __init__.py
+│   ├── Strategy
+│   │   ├── Benchmarking.py
+│   │   ├── ematalib.py
+│   │   ├── __init__.py
+│   │   ├── vxma_pandas_ta.py
+│   │   ├── vxma_talib.py
+│   │   └── vxmatalib.py
+│   ├── web
+│   │   ├── __init__.py
+│   │   └── web.py
+│   └── __init__.py
+├── app.py
+├── bot_config.csv
+├── candle.png
+├── Dockerfile
+├── LICENSE
+├── log.log
+├── README.md
+├── requirements_docker.txt
+├── requirements_pandas.txt
+├── requirements_talib.txt
+├── requirements.txt
+├── run.sh
+├── tester.py
+├── TODO
+├── vxma.db
+└── web_app.py
+```
