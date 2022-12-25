@@ -51,6 +51,7 @@ def RRTP(df, direction, step, price, TPRR1, TPRR2):
 async def connect():
     config = AppConfig()
     exchange = ccxt.binance(config.BNBCZ)
+    await exchange.load_markets(reload=True)
     return exchange
 
 
@@ -104,11 +105,10 @@ async def get_symbol():
 
 async def getAllsymbol():
     """
-    get top 10 volume symbol of the day
+    Get all symbols
     """
     symbols = pd.DataFrame()
     symbolist = bot_setting()
-    print("fecthing Symbol of Top 10 Volume...")
     exchange = await connect()
     try:
         market = await exchange.fetch_tickers(params={"type": "future"})
@@ -135,13 +135,12 @@ async def getAllsymbol():
     symbols.drop(["vwap", "open", "baseVolume", "info"], axis=1, inplace=True)
     symbols.drop(["close", "previousClose", "datetime"], axis=1, inplace=True)
     newsym = []
-    if len(symbolist.index) > 0:
+    if not symbolist.empty:
         for i in range(len(symbolist.index)):
             newsym.append(symbolist["symbol"][i])
     for symbol in symbols.index:
         newsym.append(symbol)
     newsym = list(dict.fromkeys(newsym))
-    print(f"Interested : {newsym}")
     return newsym
 
 
@@ -787,7 +786,6 @@ async def feed(
     upnl = 0.0
     posim = risk_manage["symbol"].replace("/", "")
     exchange = await connect()
-    exchange.load_markets()
     try:
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
     except Exception as e:

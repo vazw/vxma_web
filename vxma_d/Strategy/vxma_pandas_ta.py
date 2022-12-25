@@ -177,9 +177,7 @@ class vxma:
         return alpha.shift(2)
 
     def vxma_(self):
-        """
-        Core strategy that calculate VXMA
-        """
+        """Core strategy that calculate VXMA"""
         vxma = pd.Series(np.full(self.length, np.nan), index=self.data.index)
         Close = pd.Series(self.close, dtype=np.float64)
         component = pd.DataFrame(columns=["ema", "linear", "alpha"])
@@ -207,9 +205,7 @@ class vxma:
         return vxma
 
     def checkForSignal(self):
-        """
-        check for signal with calculated data.
-        """
+        """check for signal with calculated data."""
         preBuy = np.full(self.length, np.nan)
         preSell = np.full(self.length, np.nan)
         buyPrice = np.full(self.length, np.nan)
@@ -270,7 +266,6 @@ class vxma:
 
 
 vxma.__doc__ = """VXMA (vxma)
-
 VXMA is an overlap indicator. It is used to help identify
 trend, setting stop loss, identify support and resistance,
 and aim to avoid drawdown on sideway condition,

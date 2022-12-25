@@ -146,6 +146,7 @@ class RiskManageTable:
 class Last_update:
     candle: str = "T -- ----------"
     balance: str = "--"
+    status: str = "Starting"
 
 
 # ansi escape code
