@@ -1,4 +1,4 @@
-import asyncio
+import asyncio  # pyright: ignore # noqa:
 import logging
 from datetime import datetime as dt
 
@@ -18,10 +18,11 @@ def callbackRate(data):
         lowest = data["lowest"][m - 1]
         rate = round((highest - lowest) / highest * 100, 1)
         if rate > 5:
-            rate = 5
+            return 5.0
         elif rate < 0.1:
-            rate = 0.1
-        return float(rate)
+            return 0.1
+        else:
+            return rate
     except Exception as e:
         print(f"callbackRate is error : {e}")
         return 2.5
@@ -33,22 +34,24 @@ def RRTP(df, direction, step, price, TPRR1, TPRR2):
     if direction:
         low = float(df["lowest"][m - 1])
         if step == 1:
-            target = price * (1 + ((price - low) / price) * float(TPRR1))
-            return float(target)
+            return price * (1 + ((price - low) / price) * float(TPRR1))
         if step == 2:
-            target = price * (1 + ((price - low) / price) * float(TPRR2))
-            return float(target)
+            return price * (1 + ((price - low) / price) * float(TPRR2))
     else:
         high = float(df["highest"][m - 1])
         if step == 1:
-            target = price * (1 - ((high - price) / price) * float(TPRR1))
-            return float(target)
+            return price * (1 - ((high - price) / price) * float(TPRR1))
         if step == 2:
-            target = price * (1 - ((high - price) / price) * float(TPRR2))
-            return float(target)
+            return price * (1 - ((high - price) / price) * float(TPRR2))
 
 
 async def connect():
+    config = AppConfig()
+    exchange = ccxt.binance(config.BNBCZ)
+    return exchange
+
+
+async def connect_loads():
     config = AppConfig()
     exchange = ccxt.binance(config.BNBCZ)
     await exchange.load_markets(reload=True)
@@ -77,7 +80,7 @@ async def get_symbol():
         exchange = await connect()
         market = await exchange.fetch_tickers(params={"type": "future"})
     await disconnect(exchange)
-    for x, y in market.items():
+    for x, y in market.items():  # pyright: ignore
         if y["symbol"][len(y["symbol"]) - 4 : len(y["symbol"])] == "USDT":
             symbols = symbols.append(y, ignore_index=True)
     symbols = symbols.set_index("symbol")
@@ -120,7 +123,7 @@ async def getAllsymbol():
         exchange = await connect()
         market = await exchange.fetch_tickers(params={"type": "future"})
     await disconnect(exchange)
-    for x, y in market.items():
+    for x, y in market.items():  # pyright: ignore
         if y["symbol"][len(y["symbol"]) - 4 : len(y["symbol"])] == "USDT":
             symbols = symbols.append(y, ignore_index=True)
     symbols = symbols.set_index("symbol")
@@ -184,7 +187,7 @@ async def setleverage(symbol, lev, exchange):
         await disconnect(exchange)
 
         logging.info(e)
-        exchange = await connect()
+        exchange = await connect_loads()
     lever = await exchange.fetch_positions_risk([symbol])
     for x in range(len(lever)):
         if (lever[x]["symbol"]) == symbol:
@@ -359,7 +362,7 @@ async def USETPLONG(
 ):
     try:
         stop_price = RRTP(df, True, 1, ask, TPRR1, TPRR2)
-        orderTP = await exchange.create_ordee(
+        orderTP = await exchange.create_order(
             symbol,
             "TAKE_PROFIT_MARKET",
             "sell",
@@ -431,7 +434,8 @@ def sellsize(df, balance, symbol, exchange, RISK):
 # OpenLong=Buy
 async def OpenLong(df, balance, risk_manage, currentMODE, Lside, min_balance):
     try:
-        exchange = await connect()
+        exchange = await connect_loads()
+        await exchange.cancel_all_orders(risk_manage["symbol"])
         amount = buysize(
             df,
             balance,
@@ -510,7 +514,7 @@ async def OpenLong(df, balance, risk_manage, currentMODE, Lside, min_balance):
             msg = (
                 "BINANCE:"
                 + f"\nCoin        : {risk_manage['symbol']}"
-                + "\nStatus      : OpenShort[SELL]"
+                + "\nStatus      : OpenLong[BUY]"
                 + f"\nAmount      : {amount}({round((amount * ask), 2)}USDT)"
                 + f"\nPrice       : {ask}USDT"
                 + f"\nmargin      : {round(margin, 2)}USDT"
@@ -576,7 +580,8 @@ async def USETPSHORT(
 # OpenShort=Sell
 async def OpenShort(df, balance, risk_manage, currentMODE, Sside, min_balance):
     try:
-        exchange = await connect()
+        exchange = await connect_loads()
+        await exchange.cancel_all_orders(risk_manage["symbol"])
         amount = sellsize(
             df,
             balance,
@@ -680,7 +685,7 @@ async def OpenShort(df, balance, risk_manage, currentMODE, Sside, min_balance):
 # CloseLong=Sell
 async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
     try:
-        exchange = await connect()
+        exchange = await connect_loads()
         amount = abs(amt)
         upnl = pnl
         try:
@@ -730,7 +735,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
 # CloseShort=Buy
 async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
     try:
-        exchange = await connect()
+        exchange = await connect_loads()
         amount = abs(amt)
         upnl = pnl
         try:
@@ -761,7 +766,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
         msg = (
             "BINANCE:\n"
             f"Coin        : {symbol}\n"
-            "Status      : CloseLong[SELL]\n"
+            "Status      : CloseShort[BUY]\n"
             f"Amount      : {str(amount)}({round((amount * ask), 2)}USDT)\n"
             f"Price       : {ask} USDT\n"
             f"Realized P/L:  {round(upnl, 2)}USDT\n"
@@ -826,11 +831,11 @@ async def feed(
         is_in_Short = False
         is_in_Long = False
     last = len(df.index) - 1
+    await disconnect(exchange)
     if df["BUY"][last] == 1:
         print("changed to Bullish, buy")
         if is_in_Short:
             print("closeshort")
-            await disconnect(exchange)
             await CloseShort(
                 df,
                 balance,
@@ -841,9 +846,6 @@ async def feed(
                 risk_manage["timeframe"],
             )
             if risk_manage["use_long"]:
-                exchange = await connect()
-                await exchange.cancel_all_orders(risk_manage["symbol"])
-                await disconnect(exchange)
                 await OpenLong(
                     df,
                     balance,
@@ -856,8 +858,6 @@ async def feed(
                 print("No permission for excute order : Do nothing")
 
         elif not is_in_Long and risk_manage["use_long"]:
-            await exchange.cancel_all_orders(risk_manage["symbol"])
-            await disconnect(exchange)
             await OpenLong(
                 df,
                 balance,
@@ -872,7 +872,6 @@ async def feed(
         print("changed to Bearish, Sell")
         if is_in_Long:
             print("closelong")
-            await disconnect(exchange)
             await CloseLong(
                 df,
                 balance,
@@ -883,9 +882,6 @@ async def feed(
                 risk_manage["timeframe"],
             )
             if risk_manage["use_short"]:
-                exchange = await connect()
-                await exchange.cancel_all_orders(risk_manage["symbol"])
-                await disconnect(exchange)
                 await OpenShort(
                     df,
                     balance,
@@ -897,8 +893,6 @@ async def feed(
             else:
                 print("No permission for excute order : Do nothing")
         elif not is_in_Short and risk_manage["use_short"]:
-            await exchange.cancel_all_orders(risk_manage["symbol"])
-            await disconnect(exchange)
             await OpenShort(
                 df,
                 balance,
@@ -909,4 +903,3 @@ async def feed(
             )
         else:
             print("already in position, nothing to do")
-    return await disconnect(exchange)
