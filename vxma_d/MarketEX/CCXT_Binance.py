@@ -408,8 +408,7 @@ def buysize(df, balance, symbol, exchange, RISK):
     else:
         risk = float(RISK)
     amount = abs(risk / (df["close"][last] - low))
-    qty_precision = exchange.amount_to_precision(symbol, amount)
-    lot = qty_precision
+    lot = exchange.amount_to_precision(symbol, amount)
     return float(lot)
 
 
@@ -425,8 +424,7 @@ def sellsize(df, balance, symbol, exchange, RISK):
     else:
         risk = float(RISK)
     amount = abs(risk / (high - df["close"][last]))
-    qty_precision = exchange.amount_to_precision(symbol, amount)
-    lot = qty_precision
+    lot = exchange.amount_to_precision(symbol, amount)
     return float(lot)
 
 
@@ -461,7 +459,10 @@ async def OpenLong(df, balance, risk_manage, currentMODE, Lside, min_balance):
             risk_manage["symbol"], risk_manage["leverage"], exchange
         )
         if amount * ask > risk_manage["max_size"] * int(leve):
-            amount = risk_manage["max_size"] * int(leve) / ask
+            new_lots = risk_manage["max_size"] * int(leve) / ask
+            amount = float(
+                exchange.amount_to_precision(risk_manage["symbol"], new_lots)
+            )
         free = float(balance["free"]["USDT"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
         amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
@@ -528,7 +529,7 @@ async def OpenLong(df, balance, risk_manage, currentMODE, Lside, min_balance):
         print(e)
         logging.info(e)
         notify_send(f"เกิดความผิดพลาดในการเข้า Order {e}")
-    return
+    return await disconnect(exchange)
 
 
 async def USETPSHORT(
@@ -603,7 +604,10 @@ async def OpenShort(df, balance, risk_manage, currentMODE, Sside, min_balance):
             risk_manage["symbol"], risk_manage["leverage"], exchange
         )
         if amount * bid > risk_manage["max_size"] * int(leve):
-            amount = risk_manage["max_size"] * int(leve) / bid
+            new_lots = risk_manage["max_size"] * int(leve) / bid
+            amount = float(
+                exchange.amount_to_precision(risk_manage["symbol"], new_lots)
+            )
         free = float(balance["free"]["USDT"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
         amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
@@ -670,7 +674,7 @@ async def OpenShort(df, balance, risk_manage, currentMODE, Sside, min_balance):
         print(e)
         logging.info(e)
         notify_send("เกิดความผิดพลาดในการเข้า Order")
-    return
+    return await disconnect(exchange)
 
 
 # CloseLong=Sell
@@ -720,7 +724,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
     except Exception as e:
         print(e)
         notify_send(f"เกิดความผิดพลาดในการออก Order {e}")
-    return
+    return await disconnect(exchange)
 
 
 # CloseShort=Buy
@@ -769,7 +773,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
     except Exception as e:
         print(e)
         notify_send(f"เกิดความผิดพลาดในการออก Order {e}")
-    return
+    return await disconnect(exchange)
 
 
 async def feed(
@@ -826,6 +830,7 @@ async def feed(
         print("changed to Bullish, buy")
         if is_in_Short:
             print("closeshort")
+            await disconnect(exchange)
             await CloseShort(
                 df,
                 balance,
@@ -836,7 +841,9 @@ async def feed(
                 risk_manage["timeframe"],
             )
             if risk_manage["use_long"]:
+                exchange = await connect()
                 await exchange.cancel_all_orders(risk_manage["symbol"])
+                await disconnect(exchange)
                 await OpenLong(
                     df,
                     balance,
@@ -850,6 +857,7 @@ async def feed(
 
         elif not is_in_Long and risk_manage["use_long"]:
             await exchange.cancel_all_orders(risk_manage["symbol"])
+            await disconnect(exchange)
             await OpenLong(
                 df,
                 balance,
@@ -864,6 +872,7 @@ async def feed(
         print("changed to Bearish, Sell")
         if is_in_Long:
             print("closelong")
+            await disconnect(exchange)
             await CloseLong(
                 df,
                 balance,
@@ -874,7 +883,9 @@ async def feed(
                 risk_manage["timeframe"],
             )
             if risk_manage["use_short"]:
+                exchange = await connect()
                 await exchange.cancel_all_orders(risk_manage["symbol"])
+                await disconnect(exchange)
                 await OpenShort(
                     df,
                     balance,
@@ -887,6 +898,7 @@ async def feed(
                 print("No permission for excute order : Do nothing")
         elif not is_in_Short and risk_manage["use_short"]:
             await exchange.cancel_all_orders(risk_manage["symbol"])
+            await disconnect(exchange)
             await OpenShort(
                 df,
                 balance,
@@ -897,4 +909,4 @@ async def feed(
             )
         else:
             print("already in position, nothing to do")
-    await disconnect(exchange)
+    return await disconnect(exchange)

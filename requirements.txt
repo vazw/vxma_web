@@ -20,3 +20,4 @@ pandas-ta
 plotly
 tabulate
 gunicorn
+moment

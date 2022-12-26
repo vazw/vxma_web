@@ -1,11 +1,3 @@
-# The BEERWARE License (BEERWARE)
-#
-# Copyright (c) 2022 Author. All rights reserved.
-#
-# Licensed under the "THE BEER-WARE LICENSE" (Revision 42):
-# vazw wrote this file. As long as you retain this notice you
-# can do whatever you want with this stuff. If we meet some day, and you think
-# this stuff is worth it, you can buy me a beer or coffee in return
 import asyncio
 import logging
 import time
@@ -153,6 +145,7 @@ async def scanSideway():
     symbolist = await getAllsymbol()
     print(len(symbolist))
     ta_data = TATable()
+    symbols = []
     for symbol in symbolist:
         try:
             df1, df2, df3 = await asyncio.gather(
@@ -168,11 +161,29 @@ async def scanSideway():
                 long_term_score = long_term.benchmarking()
                 mid_term_score = mid_term.benchmarking()
                 short_term_score = short_term.benchmarking()
-
+                if (
+                    (
+                        long_term_score == "Side-Way"
+                        and mid_term_score == "Side-Way"
+                    )
+                    or (
+                        long_term_score == "Side-Way"
+                        and short_term_score == "Side-Way"
+                    )
+                    or (
+                        mid_term_score == "Side-Way"
+                        and short_term_score == "Side-Way"
+                    )
+                ):
+                    print("pass")
+                else:
+                    symbols.append(symbol)
+                    print("add")
         except Exception as e:
             print(e)
             logging.info(e)
             pass
+    return symbols
 
 
 async def get_dailytasks():
@@ -291,14 +302,14 @@ async def dailyreport():
 
 
 async def running_module():
-    lastUpdate.status = "Scaning"
+    lastUpdate.status = "Loading..."
     symbolist = bot_setting()
     seconds = time.time()
     local_time = time.ctime(seconds)
     if str(local_time[14:-9]) == "1":
         insession["day"] = False
         insession["hour"] = False
-    if str(local_time[12:-9]) == "7:0" and not insession["day"]:
+    if str(local_time[11:-9]) == "07:0" and not insession["day"]:
         insession["day"] = True
         insession["hour"] = True
         await asyncio.gather(dailyreport())
@@ -313,7 +324,7 @@ async def running_module():
             logging.info(e)
             exchange = await connect()
             balance = await exchange.fetch_balance()
-        if str(local_time[14:-9]) == "3" and not insession["hour"]:
+        if str(local_time[14:-9]) == "0" and not insession["hour"]:
             hourly_report(balance)
         free_balance = float(balance["free"]["USDT"])
         lastUpdate.balance = round(float(balance["total"]["USDT"]), 2)
@@ -398,9 +409,7 @@ async def running_module():
         )
         print(
             f"Margin Used : {colorCS.CBOLD + colorCS.CRED}{round(margin, 3)} ${colorCS.CEND}"  # noqa:
-        )
-        print(
-            f"NET unrealizedProfit : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
+            + f"  NET P/L : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
         )
         lastUpdate.status = "idle"
         await asyncio.sleep(30)
@@ -460,7 +469,7 @@ async def warper_fn():
             logging.info(e)
             notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
             lastUpdate.status = "Sleep Mode"
-            await asyncio.sleep(3600)
+            await asyncio.sleep(60)
             tasks = asyncio.current_task()
             tasks.cancel()
             raise ConnectionError
@@ -469,7 +478,6 @@ async def warper_fn():
 async def run_bot():
     try:
         await asyncio.gather(warper_fn(), waiting())
-        # await asyncio.gather(dailyreport(), waiting())
     except Exception as e:
         logging.info(e)
         notify_send(

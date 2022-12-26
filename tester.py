@@ -23,7 +23,8 @@ import os
 
 import mplfinance as mplf
 
-from vxma_d.Strategy.Candle_ohlc import downloadCandle, downloadMultiCandle
+from vxma_d.AppData.Bot import scanSideway
+from vxma_d.Backtesting.Candle_ohlc import downloadCandle, downloadMultiCandle
 
 rcs = {
     "axes.labelcolor": "none",
@@ -104,5 +105,12 @@ async def main():
     candle(df, symbol, tf)
 
 
+async def test_scan():
+    symbols = await scanSideway()
+    print(symbols)
+    print(len(symbols))
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # asyncio.run(main())
+    asyncio.run(test_scan())
