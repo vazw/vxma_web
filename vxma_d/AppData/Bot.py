@@ -25,12 +25,20 @@ from vxma_d.MarketEX.CCXT_Binance import (
     get_symbol,
     getAllsymbol,
 )
-from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 
+have_talib = False
 try:
     from vxma_d.Strategy.vxma_talib import vxma as ta
+
+    have_talib = True
 except Exception as e:  # noqa:
     from vxma_d.Strategy.vxma_pandas_ta import vxma as ta
+
+    have_talib = False
+
+if have_talib:
+    from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
+
 
 bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.1) github.com/vazw/vxma_web"
 
@@ -290,7 +298,8 @@ async def running_module():
     if str(local_time[11:-9]) == "07:0" and not insession["day"]:
         insession["day"] = True
         insession["hour"] = True
-        await asyncio.gather(dailyreport())
+        if have_talib:
+            await asyncio.gather(dailyreport())
     if not symbolist.empty:
         balance = await fetching_balance()
         if str(local_time[14:-9]) == "0" and not insession["hour"]:
