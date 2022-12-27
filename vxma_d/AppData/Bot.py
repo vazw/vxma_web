@@ -4,7 +4,6 @@ import time
 import warnings
 from uuid import uuid4
 
-import mplfinance as mplf
 import pandas as pd
 
 from vxma_d.AppData import colorCS, lastUpdate
@@ -18,10 +17,10 @@ from vxma_d.AppData.Appdata import (
     notify_send,
 )
 from vxma_d.MarketEX.CCXT_Binance import (
-    connect,
-    disconnect,
     feed,
     fetchbars,
+    fetching_balance,
+    get_currentmode,
     get_symbol,
     getAllsymbol,
 )
@@ -42,16 +41,6 @@ logging.basicConfig(
     filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
 )
 
-rcs = {
-    "axes.labelcolor": "none",
-    "axes.spines.left": False,
-    "axes.spines.right": False,
-    "axes.axisbelow": False,
-    "axes.grid": True,
-    "grid.linestyle": ":",
-    "axes.titlesize": "xx-large",
-    "axes.titleweight": "bold",
-}
 
 # Bot setting
 insession = dict(name=False, day=False, hour=False)
@@ -94,18 +83,6 @@ TIMEFRAMES_DICT = {
     "1w": "1w",
     "1M": "1M",
 }
-
-
-color = mplf.make_marketcolors(
-    up="white", down="black", wick="black", edge="black"
-)
-s = mplf.make_mpf_style(
-    rc=rcs,
-    y_on_right=True,
-    marketcolors=color,
-    figcolor="white",
-    gridaxis="horizontal",
-)
 
 
 async def bot_1(symbol, ta_data, tf):
@@ -245,15 +222,7 @@ async def dailyreport():
         async for line in get_dailytasks():
             msg1 = remove_last_line_from_string(str(line))
             notify_send(msg=msg1)
-        exchange = await connect()
-        try:
-            balance = await exchange.fetch_balance()
-        except Exception as e:
-            print(e)
-            await disconnect(exchange)
-            logging.info(e)
-            exchange = await connect()
-            balance = await exchange.fetch_balance()
+        balance = await fetching_balance()
         positions = balance["info"]["positions"]
         current_positions = [
             position
@@ -293,7 +262,6 @@ async def dailyreport():
             sticker=1995,
             package=446,
         )
-        await disconnect(exchange)
         return
     except Exception as e:
         notify_send(f"เกิดความผิดพลาดในส่วนของแจ้งเตือนรายวัน {e}")
@@ -314,21 +282,11 @@ async def running_module():
         insession["hour"] = True
         await asyncio.gather(dailyreport())
     if not symbolist.empty:
-        exchange = await connect()
-
-        try:
-            balance = await exchange.fetch_balance()
-        except Exception as e:
-            print(e)
-            await disconnect(exchange)
-            logging.info(e)
-            exchange = await connect()
-            balance = await exchange.fetch_balance()
+        balance = await fetching_balance()
         if str(local_time[14:-9]) == "0" and not insession["hour"]:
             hourly_report(balance)
         free_balance = float(balance["free"]["USDT"])
         lastUpdate.balance = round(float(balance["total"]["USDT"]), 2)
-        await disconnect(exchange)
         for i in symbolist.index:
             try:
 
@@ -386,7 +344,7 @@ async def running_module():
                         package=1070,
                     )
                     return
-                await asyncio.sleep(exchange.rateLimit / 1000)
+                await asyncio.sleep(0.1)
                 await asyncio.gather(
                     feed(
                         data,
@@ -471,17 +429,17 @@ async def warper_fn():
             lastUpdate.status = "Sleep Mode"
             await asyncio.sleep(60)
             tasks = asyncio.current_task()
+            clearconsol()
             tasks.cancel()
             raise ConnectionError
 
 
 async def run_bot():
     try:
+        await get_currentmode()
         await asyncio.gather(warper_fn(), waiting())
     except Exception as e:
         logging.info(e)
-        notify_send(
-            f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่สถานะ Fallback Mode"
-        )
+        notify_send("บอทเข้าสู่สถานะ Fallback Mode")
         lastUpdate.status = "Fallback Mode : Restarting..."
         return

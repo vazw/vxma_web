@@ -7,7 +7,6 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer or coffee in return
 
-import asyncio
 import os
 import sqlite3
 from dataclasses import dataclass
@@ -149,6 +148,13 @@ class Last_update:
     status: str = "Starting"
 
 
+@dataclass
+class PositionMode:
+    dualSidePosition: bool = False
+    Sside: str = "BOTH"
+    Lside: str = "BOTH"
+
+
 # ansi escape code
 @dataclass
 class ColorCS:
@@ -217,16 +223,20 @@ class AppConfig:
 def notify_send(msg, sticker=None, package=None, image_path=None):
     config = AppConfig()
     notify = LineNotify(config.notify_token)
-    if image_path is not None:
-        return notify.send(message=msg, image_path=image_path)
-    elif sticker is not None:
-        return notify.send(
-            msg,
-            sticker_id=sticker,
-            package_id=package,
-        )
-    else:
-        return notify.send(msg)
+    try:
+        if image_path is not None:
+            return notify.send(message=msg, image_path=image_path)
+        elif sticker is not None:
+            return notify.send(
+                msg,
+                sticker_id=sticker,
+                package_id=package,
+            )
+        else:
+            return notify.send(msg)
+    except Exception as e:
+        print(e)
+        return
 
 
 def candle(df, symbol, tf):
@@ -277,7 +287,7 @@ def clearconsol():
         if os.name == "posix":
             os.system("clear")
         else:
-            os.system("cls")
+            os.system("cls")  # pyright: ignore
         return
     except Exception as e:
         print(e)
