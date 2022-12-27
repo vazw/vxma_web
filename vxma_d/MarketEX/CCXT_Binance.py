@@ -214,18 +214,17 @@ async def setleverage(symbol, lev):
     return round(int(lev), 0)
 
 
-def RR1(df, side, price):
-    m = len(df.index)
+def RR1(stop, side, price):
     if side:
-        low = df["lowest"][m - 1]
+        low = stop
         target = price * (1 + ((price - float(low)) / price) * 1)
         return target
     elif not side:
-        high = df["highest"][m - 1]
+        high = stop
         target = price * (1 - ((float(high) - price) / price) * 1)
         return target
     else:
-        return -1
+        return None
 
 
 async def USESLSHORT(
@@ -246,14 +245,18 @@ async def USESLSHORT(
                 },
             )
             if Tailing_SL:
+                triggerPrice = RR1(high, False, bid)
+                if triggerPrice is None:
+                    return
+                callbackrate = callbackRate(df)
                 ordertailingSL = await exchange.create_order(
                     symbol,
                     "TRAILING_STOP_MARKET",
                     "buy",
                     amount,
                     params={
-                        "activationPrice": float(RR1(df, False, bid)),
-                        "callbackRate": callbackRate(df),
+                        "activationPrice": triggerPrice,
+                        "callbackRate": callbackrate,
                         "positionSide": Sside,
                     },
                 )
@@ -273,14 +276,18 @@ async def USESLSHORT(
                 },
             )
             if Tailing_SL:
+                triggerPrice = RR1(high, False, bid)
+                if triggerPrice is None:
+                    return
+                callbackrate = callbackRate(df)
                 ordertailingSL = await exchange.create_order(
                     symbol,
                     "TRAILING_STOP_MARKET",
                     "buy",
                     amount,
                     params={
-                        "activationPrice": float(RR1(df, False, bid)),
-                        "callbackRate": callbackRate(df),
+                        "activationPrice": triggerPrice,
+                        "callbackRate": callbackrate,
                         "reduceOnly": True,
                         "positionSide": Sside,
                     },
@@ -313,23 +320,22 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                 },
             )
             if Tailing_SL:
-                triggerPrice = RR1(df, True, ask)
-                if triggerPrice == -1:
+                triggerPrice = RR1(low, True, ask)
+                if triggerPrice is None:
                     return
-                else:
-                    callbackrate = callbackRate(df)
-                    ordertailingSL = await exchange.create_order(
-                        symbol,
-                        "TRAILING_STOP_MARKET",
-                        "sell",
-                        amount,
-                        params={
-                            "activationPrice": triggerPrice,
-                            "callbackRate": callbackrate,
-                            "positionSide": side,
-                        },
-                    )
-                    logging.info(ordertailingSL)
+                callbackrate = callbackRate(df)
+                ordertailingSL = await exchange.create_order(
+                    symbol,
+                    "TRAILING_STOP_MARKET",
+                    "sell",
+                    amount,
+                    params={
+                        "activationPrice": triggerPrice,
+                        "callbackRate": callbackrate,
+                        "positionSide": side,
+                    },
+                )
+                logging.info(ordertailingSL)
         else:
             orderSL = await exchange.create_order(
                 symbol,
@@ -345,23 +351,22 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                 },
             )
             if Tailing_SL:
-                triggerPrice = RR1(df, True, ask)
-                if triggerPrice == -1:
+                triggerPrice = RR1(low, True, ask)
+                if triggerPrice is None:
                     return
-                else:
-                    callbackrate = callbackRate(df)
-                    ordertailingSL = await exchange.create_order(
-                        symbol,
-                        "TRAILING_STOP_MARKET",
-                        "sell",
-                        amount,
-                        params={
-                            "activationPrice": triggerPrice,
-                            "callbackRate": callbackrate,
-                            "positionSide": side,
-                        },
-                    )
-                    logging.info(ordertailingSL)
+                callbackrate = callbackRate(df)
+                ordertailingSL = await exchange.create_order(
+                    symbol,
+                    "TRAILING_STOP_MARKET",
+                    "sell",
+                    amount,
+                    params={
+                        "activationPrice": triggerPrice,
+                        "callbackRate": callbackrate,
+                        "positionSide": side,
+                    },
+                )
+                logging.info(ordertailingSL)
         logging.info(orderSL)
         return
     except Exception as e:
