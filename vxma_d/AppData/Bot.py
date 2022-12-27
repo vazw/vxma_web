@@ -29,7 +29,7 @@ from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 
 try:
     from vxma_d.Strategy.vxma_talib import vxma as ta
-except Exception as e:
+except Exception as e:  # noqa:
     from vxma_d.Strategy.vxma_pandas_ta import vxma as ta
 
 bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.1) github.com/vazw/vxma_web"
