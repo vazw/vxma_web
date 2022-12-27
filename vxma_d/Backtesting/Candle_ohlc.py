@@ -44,7 +44,6 @@ async def fetching_candle(symbol: str, timeframe: str) -> pd.DataFrame:
         try:
             await asyncio.sleep(50 / 100)
             exchange = ccxt.binance()
-            print(exchange.rateLimit)
             currentDay = moment.utcnow()
             timeInepoch = currentDay.add(seconds=seconds).epoch(
                 milliseconds=True

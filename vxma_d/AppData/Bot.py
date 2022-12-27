@@ -5,6 +5,7 @@ import warnings
 from uuid import uuid4
 
 import pandas as pd
+from tabulate import tabulate
 
 from vxma_d.AppData import colorCS, lastUpdate
 from vxma_d.AppData.Appdata import (
@@ -36,10 +37,6 @@ bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.1) github.com/vazw/vxma_web"
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
 warnings.filterwarnings("ignore")
-
-logging.basicConfig(
-    filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
-)
 
 
 # Bot setting
@@ -84,6 +81,16 @@ TIMEFRAMES_DICT = {
     "1M": "1M",
 }
 
+common_names = {
+    "symbol": "Symbols",
+    "entryPrice": "ราคาเข้า",
+    "positionSide": "Side",
+    "unrealizedProfit": "u.P/L $",
+    "positionAmt": "Amount",
+    "initialMargin": "Margin $",
+    "leverage": "Leverage",
+}
+
 
 async def bot_1(symbol, ta_data, tf):
     try:
@@ -92,7 +99,8 @@ async def bot_1(symbol, ta_data, tf):
         data1 = bot1.indicator()
         return data1
     except Exception as e:
-        print(e)
+        lastUpdate.status = f"{e}"
+        logging.info(e)
         pass
 
 
@@ -103,7 +111,8 @@ async def bot_2(symbol, ta_data, tf):
         data2 = bot2.indicator()
         return data2
     except Exception as e:
-        print(e)
+        lastUpdate.status = f"{e}"
+        logging.info(e)
         pass
 
 
@@ -114,13 +123,14 @@ async def bot_3(symbol, ta_data, tf):
         data3 = bot3.indicator()
         return data3
     except Exception as e:
-        print(e)
+        lastUpdate.status = f"{e}"
+        logging.info(e)
         pass
 
 
 async def scanSideway():
     symbolist = await getAllsymbol()
-    print(len(symbolist))
+    lastUpdate.status = f"Scanning {len(symbolist)} Symbols"
     ta_data = TATable()
     symbols = []
     for symbol in symbolist:
@@ -152,12 +162,12 @@ async def scanSideway():
                         and short_term_score == "Side-Way"
                     )
                 ):
-                    print("pass")
+                    pass
                 else:
                     symbols.append(symbol)
-                    print("add")
+                    lastUpdate.status = f"Added {symbol} to list"
         except Exception as e:
-            print(e)
+            lastUpdate.status = f"{e}"
             logging.info(e)
             pass
     return symbols
@@ -166,7 +176,6 @@ async def scanSideway():
 async def get_dailytasks():
     daycollum = ["Symbol", "LastPirce", "Long-Term", "Mid-Term", "Short-Term"]
     symbolist = await get_symbol()
-    print(len(symbolist))
     ta_data = TATable()
     for symbol in symbolist:
         try:
@@ -194,7 +203,7 @@ async def get_dailytasks():
                     index=daycollum,
                 )
         except Exception as e:
-            print(e)
+            lastUpdate.status = f"{e}"
             logging.info(e)
             pass
 
@@ -265,7 +274,8 @@ async def dailyreport():
         return
     except Exception as e:
         notify_send(f"เกิดความผิดพลาดในส่วนของแจ้งเตือนรายวัน {e}")
-        print(e)
+        lastUpdate.status = f"{e}"
+        logging.info(e)
         return
 
 
@@ -344,7 +354,7 @@ async def running_module():
                         package=1070,
                     )
                     return
-                await asyncio.sleep(0.1)
+                await asyncio.sleep(50 / 1000)
                 await asyncio.gather(
                     feed(
                         data,
@@ -356,25 +366,30 @@ async def running_module():
                 )
 
             except Exception as e:
-                print(e)
+                lastUpdate.status = f"{e}"
+                logging.info(e)
                 pass
+
         clearconsol()
-        print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
-        print(
-            status.to_string(index=False)
-            if not status.empty
-            else "NO POSITION"
+        status["unrealizedProfit"] = (
+            (status["unrealizedProfit"]).astype("float64").round(2)
         )
+        status["initialMargin"] = (
+            (status["initialMargin"]).astype("float64").round(2)
+        )
+        status.rename(columns=common_names, errors="ignore", inplace=True)
+        print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
+        print(tabulate(status, showindex=False, headers="keys"))
         print(
             f"Margin Used : {colorCS.CBOLD + colorCS.CRED}{round(margin, 3)} ${colorCS.CEND}"  # noqa:
             + f"  NET P/L : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
+            + f" Balance : {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance} ${colorCS.CEND}"  # noqa:
         )
         lastUpdate.status = "idle"
         await asyncio.sleep(30)
     else:
-        await asyncio.sleep(60)
         lastUpdate.status = "idle"
-        print("Nothing to do now.....")
+        await asyncio.sleep(60)
 
 
 async def waiting():
@@ -400,6 +415,7 @@ async def waiting():
         await asyncio.sleep(0.2)
         text_time = f"{colorCS.CYELLOW} เวลา {colorCS.CGREEN}"
         time_now = f"{(lastUpdate.candle)[:-10].replace('T',text_time)}"
+        status_text = f"{lastUpdate.status}"
         print(
             "\r"
             + colorCS.CRED
@@ -408,10 +424,9 @@ async def waiting():
             + f" update : {colorCS.CGREEN}"
             + time_now
             + colorCS.CRED
-            + f" Balance : {colorCS.CGREEN}{lastUpdate.balance}"
-            + f"{colorCS.CRED} $"
+            + f"{colorCS.CRED} Status : "
             + colorCS.CEND
-            + f"({lastUpdate.status})",
+            + status_text[0:27],
             end="",
         )
         count += 1
@@ -423,7 +438,7 @@ async def warper_fn():
         try:
             await running_module()
         except Exception as e:
-            print(e)
+            lastUpdate.status = f"{e}"
             logging.info(e)
             notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
             lastUpdate.status = "Sleep Mode"

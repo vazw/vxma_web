@@ -29,7 +29,7 @@ common_names = {
 
 
 class vxma:
-    def __init__(self, data, ta_table) -> None:
+    def __init__(self, data, ta_table=None) -> None:
         """
         vxma strategy form trading view by vaz.
         using EMA, RSI, ATR, LINREG AND ALPHATREND TA to calculate.
@@ -56,6 +56,17 @@ class vxma:
             # df.dropna(axis=0, inplace=True)
             # Preemptively rename columns to lowercase
             data.rename(columns=common_names, errors="ignore", inplace=True)
+            if ta_table is None:
+                ta_table = {
+                    "atr_p": 12,
+                    "atr_m": 1.6,
+                    "ema": 30,
+                    "linear": 30,
+                    "smooth": 30,
+                    "rsi": 25,
+                    "aol": 30,
+                    "pivot": 60,
+                }
 
             # Preemptively lowercase the index
             index_name = data.index.name

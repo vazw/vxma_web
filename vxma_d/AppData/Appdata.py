@@ -7,6 +7,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer or coffee in return
 
+import logging
 import os
 import sqlite3
 from dataclasses import dataclass
@@ -19,7 +20,7 @@ from line_notify import LineNotify
 barsC = 1502
 
 rcs = {
-    "axes.labelcolor": "none",
+    "axes.labelcolor": "white",
     "axes.spines.left": False,
     "axes.spines.right": False,
     "axes.axisbelow": False,
@@ -31,14 +32,20 @@ rcs = {
 
 
 colors_candle = mplf.make_marketcolors(
-    up="white", down="black", wick="black", edge="black"
+    up="black",
+    down="white",
+    wick="white",
+    edge="white",
+    volume={"up": "green", "down": "red"},
 )
 style_candle = mplf.make_mpf_style(
+    base_mpf_style="nightclouds",
     rc=rcs,
-    y_on_right=True,
+    y_on_right=False,
     marketcolors=colors_candle,
-    figcolor="white",
+    figcolor="black",
     gridaxis="horizontal",
+    facecolor="black",
 )
 
 BOTCOL = [
@@ -67,6 +74,10 @@ BOTCOL = [
     "Risk",
     "maxMargin",
 ]
+
+logging.basicConfig(
+    filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
+)
 
 
 def bot_setting():
@@ -126,7 +137,7 @@ class RiskManageTable:
         self.use_tp_1 = self.check_bool(symbolist["UseTP"][col_index])
         self.use_tp_2 = self.check_bool(symbolist["UseTP2"][col_index])
         self.use_sl = self.check_bool(symbolist["UseSL"][col_index])
-        self.use_tailing = self.check_bool(symbolist["Tail_SL"])
+        self.use_tailing = self.check_bool(symbolist["Tail_SL"][col_index])
         self.max_size = max_margin_size(
             str(symbolist["maxMargin"][col_index]), free_balance
         )
@@ -235,16 +246,16 @@ def notify_send(msg, sticker=None, package=None, image_path=None):
         else:
             return notify.send(msg)
     except Exception as e:
-        print(e)
+        logging.info(e)
         return
 
 
 def candle(df, symbol, tf):
     data = df.tail(60)
-    titles = f"{symbol}_{tf}"
+    titles = f"{symbol}_{tf}".upper()
     try:
         vxma = mplf.make_addplot(
-            data.vxma, secondary_y=False, color="blue", linewidths=0.2
+            data.vxma, secondary_y=False, color="yellow", linewidths=0.2
         )
         buy = mplf.make_addplot(
             data.buyPrice, secondary_y=False, color="green", scatter=True
@@ -266,7 +277,7 @@ def candle(df, symbol, tf):
             xrotation=20,
         )
     except Exception as e:
-        print(f"{e}")
+        logging.info(e)
         mplf.plot(
             data,
             type="candle",
@@ -287,8 +298,8 @@ def clearconsol():
         if os.name == "posix":
             os.system("clear")
         else:
-            os.system("cls")  # pyright: ignore
+            os.system("cls")
         return
     except Exception as e:
-        print(e)
+        logging.info(e)
         return
