@@ -81,24 +81,24 @@ class vxma:
     def swing_low(self):
         """calculate swing low price with given data"""
         df = self.data
-        lowest = df["low"].tail(self.pivot).copy()
+        lowest = df["low"].copy()
         for i in range(self.length - self.pivot, self.length):
             if df["low"][i] < lowest[i - 1]:
                 lowest[i] = df["low"][i]
             else:
                 lowest[i] = lowest[i - 1]
-        return lowest
+        return lowest.tail(self.pivot)
 
     def swing_high(self):
         """calculate swing high price with given data"""
         df = self.data
-        highest = df["high"].tail(self.pivot).copy()
+        highest = df["high"].copy()
         for i in range(self.length - self.pivot, self.length):
             if df["high"][i] > highest[i - 1]:
                 highest[i] = df["high"][i]
             else:
                 highest[i] = highest[i - 1]
-        return highest
+        return highest.tail(self.pivot)
 
     def andean(self):
         """calculate Andean Oscillator.
@@ -107,7 +107,7 @@ class vxma:
         Then we need bull and bear component
         C = close , O = open
         up1 := nz(math.max(C, O, up1[1] - (up1[1] - C) * alpha), C)
-        up2 := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C) * alpha), C * C)
+        up2 := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C) * alpha), C * C) # noqa:
         dn1 := nz(math.min(C, O, dn1[1] + (C - dn1[1]) * alpha), C)
         dn2 := nz(math.min(C * C, O * O, dn2[1] + (C * C - dn2[1]) * alpha), C * C)
         //Components
