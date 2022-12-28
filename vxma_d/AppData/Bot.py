@@ -1,11 +1,11 @@
 import asyncio
 import logging
 import time
-import warnings
 from uuid import uuid4
+import warnings
 
 import pandas as pd
-from tabulate import tabulate
+from tabulate import tabulate  # type: ignore
 
 from vxma_d.AppData import colorCS, lastUpdate
 from vxma_d.AppData.Appdata import (
@@ -21,9 +21,9 @@ from vxma_d.MarketEX.CCXT_Binance import (
     feed,
     fetchbars,
     fetching_balance,
+    getAllsymbol,
     get_currentmode,
     get_symbol,
-    getAllsymbol,
 )
 
 have_talib = False

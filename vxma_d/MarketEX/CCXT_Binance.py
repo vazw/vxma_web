@@ -216,12 +216,10 @@ async def setleverage(symbol, lev):
 
 def RR1(stop, side, price):
     if side:
-        low = stop
-        target = price * (1 + ((price - float(low)) / price) * 1)
+        target = price * (1 + ((price - float(stop)) / price) * 1)
         return target
     elif not side:
-        high = stop
-        target = price * (1 - ((float(high) - price) / price) * 1)
+        target = price * (1 - ((float(stop) - price) / price) * 1)
         return target
     else:
         return None
