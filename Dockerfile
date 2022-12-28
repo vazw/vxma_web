@@ -1,18 +1,21 @@
 FROM zasoliton/python-talib As builder
 
+
+RUN python -m venv env
+
+ENV PATH="env/:$PATH"
+
+
 COPY requirements_docker.txt ./requirements.txt
 
-RUN python3 -m pip install -r requirements.txt --no-clean
+RUN python3 -m pip install -r requirements.txt --no-clean --disable-pip-version-check
 
 FROM python
 
-WORKDIR /vxma_web
-
-COPY --from=builder /root/.local /root/.local
 COPY . .
+COPY --from=builder . .
 
-# update PATH environment variable
-ENV PATH=/root/.local:$PATH
+ENV PATH="env:$PATH"
 
 EXPOSE 8050
 # run app
