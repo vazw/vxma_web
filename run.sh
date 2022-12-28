@@ -2,7 +2,7 @@
 # checking if we have env
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-if [[ -f $DIR/env ]]; then
+if [[ ! -d $DIR/env ]]; then
     python -m virtualenv env
     python -m pip install -r requirements.txt
 fi
