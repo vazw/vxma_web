@@ -170,6 +170,7 @@ async def scanSideway():
                         and short_term_score == "Side-Way"
                     )
                 ):
+                    print(f"{symbol} is Side-Way: Pass")
                     pass
                 else:
                     symbols.append(symbol)

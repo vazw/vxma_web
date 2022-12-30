@@ -19,11 +19,9 @@
 #         input_result.append(input)
 #     return input_result
 import asyncio
-import os
 
 from vxma_d.AppData.Appdata import candle
 from vxma_d.AppData.Bot import scanSideway
-from vxma_d.Backtesting.Candle_ohlc import downloadCandle, downloadMultiCandle
 from vxma_d.MarketEX.CCXT_Binance import connect, fetchbars
 from vxma_d.Strategy.vxma_talib import vxma
 
@@ -62,5 +60,5 @@ async def load_info():
 
 
 if __name__ == "__main__":
-    asyncio.run(load_info())
-    # asyncio.run(test_scan())
+    # asyncio.run(load_info())
+    asyncio.run(test_scan())

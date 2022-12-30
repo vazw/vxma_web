@@ -1,5 +1,6 @@
 #!/bin/bash
 # checking if we have env
+export TERM=xterm
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 if [[ ! -d $DIR/env ]]; then

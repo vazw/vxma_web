@@ -15,7 +15,7 @@ FROM python
 COPY . .
 COPY --from=builder . .
 
-ENV PATH="env:$PATH"
+ENV PATH="env/:$PATH"
 
 EXPOSE 8050
 # run app
