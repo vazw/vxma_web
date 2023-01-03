@@ -6,6 +6,7 @@ DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [[ ! -d $DIR/env ]]; then
     python -m virtualenv env
     python -m pip install -r requirements.txt
+    python vxma_d/AppData/ResetDatabase.py
 fi
 
 source env/bin/activate
