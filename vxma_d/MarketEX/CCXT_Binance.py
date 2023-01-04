@@ -242,6 +242,14 @@ async def USESLSHORT(
                     "positionSide": Sside,
                 },
             )
+            msg = (
+                "BINANCE:"
+                + f"\nCoin        : {symbol}"
+                + "\nStatus      : Order-StopLoss"
+                + f"\nAmount      : {amount}"
+                + f"\nPrice       : {high}USDT"
+            )
+            notify_send(msg)
             if Tailing_SL:
                 triggerPrice = RR1(high, False, bid)
                 if triggerPrice is None:
@@ -258,6 +266,15 @@ async def USESLSHORT(
                         "positionSide": Sside,
                     },
                 )
+                msg2 = (
+                    "BINANCE:"
+                    + f"\nCoin        : {symbol}"
+                    + "\nStatus      : Tailing-StopLoss"
+                    + f"\nAmount      : {amount}"
+                    + f"\nCallbackRate: {callbackrate}%"
+                    + f"\ntriggerPrice: {triggerPrice}"
+                )
+                notify_send(msg2)
                 logging.info(ordertailingSL)
         else:
             orderSL = await exchange.create_order(
@@ -273,6 +290,14 @@ async def USESLSHORT(
                     "positionSide": Sside,
                 },
             )
+            msg = (
+                "BINANCE:"
+                + f"\nCoin        : {symbol}"
+                + "\nStatus      : Order-StopLoss"
+                + f"\nAmount      : {amount}"
+                + f"\nPrice       : {high}USDT"
+            )
+            notify_send(msg)
             if Tailing_SL:
                 triggerPrice = RR1(high, False, bid)
                 if triggerPrice is None:
@@ -290,6 +315,15 @@ async def USESLSHORT(
                         "positionSide": Sside,
                     },
                 )
+                msg2 = (
+                    "BINANCE:"
+                    + f"\nCoin        : {symbol}"
+                    + "\nStatus      : Tailing-StopLoss"
+                    + f"\nAmount      : {amount}"
+                    + f"\nCallbackRate: {callbackrate}%"
+                    + f"\ntriggerPrice: {triggerPrice}"
+                )
+                notify_send(msg2)
                 logging.info(ordertailingSL)
         logging.info(orderSL)
         return
@@ -317,6 +351,14 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                     "positionSide": side,
                 },
             )
+            msg = (
+                "BINANCE:"
+                + f"\nCoin        : {symbol}"
+                + "\nStatus      : Order-StopLoss"
+                + f"\nAmount      : {amount}"
+                + f"\nPrice       : {low}USDT"
+            )
+            notify_send(msg)
             if Tailing_SL:
                 triggerPrice = RR1(low, True, ask)
                 if triggerPrice is None:
@@ -333,6 +375,15 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                         "positionSide": side,
                     },
                 )
+                msg2 = (
+                    "BINANCE:"
+                    + f"\nCoin        : {symbol}"
+                    + "\nStatus      : Tailing-StopLoss"
+                    + f"\nAmount      : {amount}"
+                    + f"\nCallbackRate: {callbackrate}%"
+                    + f"\ntriggerPrice: {triggerPrice}"
+                )
+                notify_send(msg2)
                 logging.info(ordertailingSL)
         else:
             orderSL = await exchange.create_order(
@@ -348,6 +399,14 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                     "positionSide": side,
                 },
             )
+            msg = (
+                "BINANCE:"
+                + f"\nCoin        : {symbol}"
+                + "\nStatus      : Order-StopLoss"
+                + f"\nAmount      : {amount}"
+                + f"\nPrice       : {low}USDT"
+            )
+            notify_send(msg)
             if Tailing_SL:
                 triggerPrice = RR1(low, True, ask)
                 if triggerPrice is None:
@@ -364,6 +423,15 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                         "positionSide": side,
                     },
                 )
+                msg2 = (
+                    "BINANCE:"
+                    + f"\nCoin        : {symbol}"
+                    + "\nStatus      : Tailing-StopLoss"
+                    + f"\nAmount      : {amount}"
+                    + f"\nCallbackRate: {callbackrate}%"
+                    + f"\ntriggerPrice: {triggerPrice}"
+                )
+                notify_send(msg2)
                 logging.info(ordertailingSL)
         logging.info(orderSL)
         return
@@ -391,6 +459,14 @@ async def USETPLONG(
                 "positionSide": Lside,
             },
         )
+        msg = (
+            "BINANCE:"
+            + f"\nCoin        : {symbol}"
+            + "\nStatus      : Order-TP1"
+            + f"\nAmount      : {amttp1}"
+            + f"\nPrice       : {stop_price}USDT"
+        )
+        notify_send(msg)
         logging.info(orderTP)
         if USETP2:
             triggerPrice = RRTP(df, True, 2, ask, TPRR1, TPRR2)
@@ -406,6 +482,14 @@ async def USETPLONG(
                     "positionSide": Lside,
                 },
             )
+            msg2 = (
+                "BINANCE:"
+                + f"\nCoin        : {symbol}"
+                + "\nStatus      : Order-TP2"
+                + f"\nAmount      : {amttp2}"
+                + f"\nPrice       : {triggerPrice}"
+            )
+            notify_send(msg2)
             logging.info(orderTP2)
         return
     except Exception as e:
@@ -583,9 +667,17 @@ async def USETPSHORT(
                 "positionSide": Sside,
             },
         )
+        msg = (
+            "BINANCE:"
+            + f"\nCoin        : {symbol}"
+            + "\nStatus      : Order-TP1"
+            + f"\nAmount      : {amttp1}"
+            + f"\nPrice       : {triggerPrice}USDT"
+        )
+        notify_send(msg)
         logging.info(orderTP)
         if USETP2:
-            triggerPrice = RRTP(df, False, 2, bid, TPRR1, TPRR2)
+            triggerPrice2 = RRTP(df, False, 2, bid, TPRR1, TPRR2)
             orderTP2 = await exchange.create_order(
                 symbol,
                 "TAKE_PROFIT_MARKET",
@@ -598,6 +690,14 @@ async def USETPSHORT(
                     "positionSide": Sside,
                 },
             )
+            msg2 = (
+                "BINANCE:"
+                + f"\nCoin        : {symbol}"
+                + "\nStatus      : Order-TP2"
+                + f"\nAmount      : {amttp2}"
+                + f"\nPrice       : {triggerPrice2}"
+            )
+            notify_send(msg2)
             logging.info(orderTP2)
         return
     except Exception as e:

@@ -19,4 +19,4 @@ ENV PATH="/env/bin:$PATH"
 
 EXPOSE 8050
 # run app
-CMD ["bash", "./run.sh"]
+CMD ["bash", "./run_docker.sh"]
