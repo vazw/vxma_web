@@ -80,9 +80,6 @@ async def get_bidask(symbol, bidask="askPrice"):
 
 
 async def get_symbol():
-    """
-    get top 10 volume symbol of the day
-    """
     symbols = pd.DataFrame()
     symbolist = bot_setting()
     lastUpdate.status = "fecthing Symbol of Top 10 Volume..."

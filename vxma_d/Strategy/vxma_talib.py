@@ -104,7 +104,7 @@ class vxma:
         Then we need bull and bear component
         C = close , O = open
         up1 := nz(math.max(C, O, up1[1] - (up1[1] - C) * alpha), C)
-        up2 := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C) * alpha), C * C) # noqa:
+        up2 := nz(math.max(C * C, O * O, up2[1] - (up2[1] - C * C) * alpha), C * C)
         dn1 := nz(math.min(C, O, dn1[1] + (C - dn1[1]) * alpha), C)
         dn2 := nz(math.min(C * C, O * O, dn2[1] + (C * C - dn2[1]) * alpha), C * C)
         //Components
@@ -209,11 +209,18 @@ class vxma:
         preSell = np.full(self.length, np.nan)
         buyPrice = np.full(self.length, np.nan)
         sellPrice = np.full(self.length, np.nan)
+        slPrice = np.full(self.length, np.nan)
+        isSL = np.full(self.length, 0)
         BUY = np.full(self.length, 0)
         SELL = np.full(self.length, 0)
         trend = np.full(self.length, 0)
         vxma_ = self.data["vxma"]
         Close = self.close
+        High = self.high
+        Low = self.low
+        lowest = self.data["lowest"]
+        highest = self.data["highest"]
+        TRENDL = np.full(self.length, np.nan)
         for i in range(2, self.length):
             # Get trend True = Bull False = Bear
             if vxma_[i] > vxma_[i - 1] and vxma_[i - 1] > vxma_[i - 2]:
@@ -221,14 +228,29 @@ class vxma:
             elif vxma_[i] < vxma_[i - 1] and vxma_[i - 1] < vxma_[i - 2]:
                 trend[i] = 0
             else:
-                trend[i] = trend[i - 1]
+                if trend[i - 1] == 1 and Low[i] < slPrice[i - 1]:
+                    trend[i] = 0
+                    isSL[i] = 1
+                elif trend[i - 1] == 0 and High[i] > slPrice[i - 1]:
+                    trend[i] = 0
+                    isSL[i] = 1
+                else:
+                    trend[i] = trend[i - 1]
+            if trend[i - 1] == 1:
+                slPrice[i] = slPrice[i - 1]
+            elif trend[i - 1] == 0:
+                slPrice[i] = slPrice[i - 1]
+            else:
+                slPrice[i] = np.nan
             # if trend change get pre-signal
-            if trend[i] != 1 and trend[i - 1] == 1:
+            if trend[i] != 1 and trend[i - 1] == 1 and isSL[i] != 1:
                 preBuy[i] = 0
                 preSell[i] = 1
-            elif trend[i] == 1 and trend[i - 1] != 1:
+                TRENDL[i] = Low[i]
+            elif trend[i] == 1 and trend[i - 1] != 1 and isSL[i] != 1:
                 preBuy[i] = 1
                 preSell[i] = 0
+                TRENDL[i] = High[i]
             else:
                 preBuy[i] = 0
                 preSell[i] = 0
@@ -240,6 +262,7 @@ class vxma:
             ):
                 BUY[i] = 1
                 buyPrice[i] = Close[i]
+                slPrice[i] = lowest[i - 1]
             elif (
                 Close[i] < vxma_[i]
                 and (preSell[i] == 1 or preSell[i - 1] == 1)
@@ -247,13 +270,18 @@ class vxma:
             ):
                 SELL[i] = 1
                 sellPrice[i] = Close[i]
+                slPrice[i] = highest[i - 1]
             else:
                 BUY[i] = 0
                 SELL[i] = 0
+
         self.data["BUY"] = BUY
         self.data["buyPrice"] = buyPrice
         self.data["SELL"] = SELL
         self.data["sellPrice"] = sellPrice
+        self.data["isSL"] = isSL
+        self.data["SLPRICE"] = slPrice
+        self.data["TRENDL"] = TRENDL
         return self.data
 
     def indicator(self):

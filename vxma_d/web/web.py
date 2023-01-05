@@ -11,13 +11,16 @@ import os
 import sqlite3
 import time
 import warnings
+import math
 from uuid import uuid4
+from datetime import datetime, date
 
 import ccxt
 import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
 import pandas as pd
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 from dash import (
     CeleryManager,
     Dash,
@@ -561,8 +564,17 @@ Summary_page = dmc.Container(
             [
                 dmc.Col(
                     [
-                        dmc.Text("Comming.. soon...", size="xl"),
-                        dmc.Text(" by Vaz.", size="sm"),
+                        html.H3("Realized Profit Loss JupyterDash"),
+                        #     html.P("date_range:"),
+                        #     dcc.DatePickerRange(
+                        #         id='my-date-picker-range',
+                        #         min_date_allowed=date(1990, 1, 1),
+                        #         max_date_allowed=date(2100, 12, 31),
+                        #         initial_visible_month=date(2021, 1, 1),
+                        #         start_date=date(2021, 1, 1),
+                        #         end_date=date(2021, 12, 31)
+                        # ),
+                        # dcc.Graph(id="graph")
                     ]
                 )
             ],
@@ -1203,7 +1215,7 @@ def update_VXMA_chart(
         x=data.index,
         y=data["buyPrice"],
         mode="markers",
-        marker=dict(size=15, color="lime"),
+        marker=dict(size=20, color="lime"),
         showlegend=True,
         name="Buy",
     )
@@ -1211,7 +1223,7 @@ def update_VXMA_chart(
         x=data.index,
         y=data["sellPrice"],
         mode="markers",
-        marker=dict(size=15, color="orange"),
+        marker=dict(size=20, color="orange"),
         showlegend=True,
         name="Sell",
     )
@@ -1231,11 +1243,29 @@ def update_VXMA_chart(
         showlegend=True,
         name="Pivot Bottom",
     )
+    slprice = go.Scatter(
+        x=data.index,
+        y=data["SLPRICE"],
+        mode="lines",
+        line=go.scatter.Line(color="white"),
+        showlegend=True,
+        name="SL Price",
+    )
+    trendl = go.Scatter(
+        x=data.index,
+        y=data["TRENDL"],
+        mode="markers",
+        marker=dict(size=15, color="#00BFFF"),
+        showlegend=True,
+        name="Trend Change",
+    )
     fig.add_trace(vxma)
     fig.add_trace(buy)
     fig.add_trace(sell)
     fig.add_trace(pvtop)
     fig.add_trace(pvbot)
+    fig.add_trace(slprice)
+    fig.add_trace(trendl)
     fig.update(layout_xaxis_rangeslider_visible=False)
     fig.update_layout(yaxis={"side": "right"})
     fig.layout.xaxis.fixedrange = True
@@ -1701,6 +1731,7 @@ def edit_menu(click, rows, ready):
                 df = pd.DataFrame(rows, columns=BOTCOL)
                 df = df.dropna(axis=0, how="any")
                 df.to_csv("bot_config.csv", index=False)
+                notify_send("มีการแก้ไขบอท")
                 return [
                     dbc.Alert(
                         "Success.",
