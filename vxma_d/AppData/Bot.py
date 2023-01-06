@@ -265,10 +265,10 @@ async def dailyreport():
         status = status.sort_values(by=["unrealizedProfit"], ascending=False)
         status = status.head(1)
         print(status)
-        sim1 = status["symbol"][0]
-        upnl = round(float(status["unrealizedProfit"][0]), 2)
-        entryP = status["entryPrice"][0]
-        metthod = status["positionSide"][0]
+        sim1 = status["symbol"].first()
+        upnl = round(float(status["unrealizedProfit"].first()), 2)
+        entryP = status["entryPrice"].first()
+        metthod = status["positionSide"].first()
         msg2 = f"{sim1} {metthod} at {entryP} \nunrealizedProfit : {upnl}$"
         message = (
             f"Top Performance\n{msg2}\n-----\n"

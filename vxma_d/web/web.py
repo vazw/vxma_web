@@ -564,7 +564,7 @@ Summary_page = dmc.Container(
             [
                 dmc.Col(
                     [
-                        html.H3("Realized Profit Loss JupyterDash"),
+                        html.H3("Realized Profit Loss"),
                         #     html.P("date_range:"),
                         #     dcc.DatePickerRange(
                         #         id='my-date-picker-range',
