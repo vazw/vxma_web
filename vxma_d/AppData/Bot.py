@@ -262,14 +262,19 @@ async def dailyreport():
         netunpl = float((status["unrealizedProfit"]).astype("float64").sum())
         print(f"Margin Used : {margin}")
         print(f"NET unrealizedProfit : {netunpl}")
-        status = status.sort_values(by=["unrealizedProfit"], ascending=False)
+        status = status.sort_values(
+            by=["unrealizedProfit"], ascending=False
+        ).set_index("symbol")
         status = status.head(1)
-        print(status)
-        sim1 = status["symbol"].first()
-        upnl = round(float(status["unrealizedProfit"].first()), 2)
-        entryP = status["entryPrice"].first()
-        metthod = status["positionSide"].first()
-        msg2 = f"{sim1} {metthod} at {entryP} \nunrealizedProfit : {upnl}$"
+        firstline = (status.index)[0]
+        upnl = round(
+            float((status["unrealizedProfit"]).astype("float64").sum()), 2
+        )
+        entryP = status["entryPrice"][firstline]
+        metthod = status["positionSide"][firstline]
+        msg2 = (
+            f"{firstline} {metthod} at {entryP} \nunrealizedProfit : {upnl}$"
+        )
         message = (
             f"Top Performance\n{msg2}\n-----\n"
             + f"Net Margin Used : {round(float(margin),2)}$"
