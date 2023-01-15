@@ -1,30 +1,43 @@
 import asyncio  # pyright: ignore # noqa:
-import logging
-from datetime import datetime as dt
 
 import ccxt.async_support as ccxt
 import pandas as pd
 
-from vxma_d.AppData import currentMode, lastUpdate
-from vxma_d.AppData.Appdata import AppConfig, bot_setting, candle, notify_send
+from vxma_d.AppData import (
+    currentMode,
+    lastUpdate,
+    alrnotify,
+    candle_ohlc,
+    timer,
+)
+from vxma_d.AppData.Appdata import (
+    AppConfig,
+    bot_setting,
+    candle,
+    notify_send,
+    write_trade_record,
+)
 
 barsC = 1502
 
 
-def callbackRate(data):
+def callbackRate(data, direction):
     m = len(data.index)
+    close = data["close"][m - 1]
+    highest = data["highest"][m - 1]
+    lowest = data["lowest"][m - 1]
     try:
-        highest = data["highest"][m - 1]
-        lowest = data["lowest"][m - 1]
-        rate = round((highest - lowest) / highest * 100, 1)
+        if direction:
+            rate = round((close - lowest) / close, 1)
+        else:
+            rate = round((highest - close) / highest, 1)
         if rate > 5.0:
             return 5.0
-        elif rate < 0.1:
-            return 0.1
+        elif rate < 1.0:
+            return 1.0
         else:
             return rate
     except Exception as e:
-        logging.info(e)
         lastUpdate.status = f"callbackRate is error : {e}"
         return 2.5
 
@@ -48,8 +61,12 @@ def RRTP(df, direction, step, price, TPRR1, TPRR2):
 
 async def connect():
     config = AppConfig()
-    exchange = ccxt.binance(config.BNBCZ)
-    return exchange
+    try:
+        exchange = ccxt.binance(config.BNBCZ)
+        return exchange
+    except Exception as e:
+        print(e)
+        return await disconnect(exchange)
 
 
 async def connect_loads():
@@ -63,57 +80,37 @@ async def disconnect(exchange):
     return await exchange.close()
 
 
-async def get_bidask(symbol, bidask="askPrice"):
-    exchange = await connect()
-    try:
-        info = (await exchange.fetch_bids_asks([symbol]))[symbol]["info"]
-        await disconnect(exchange)
-        return float(info[bidask])
-    except Exception as e:
-        logging.info(e)
-        lastUpdate.status = f"{e}"
-        await disconnect(exchange)
-        exchange = await connect()
-        info = (await exchange.fetch_bids_asks([symbol]))[symbol]["info"]
-        await disconnect(exchange)
-        return float(info[bidask])
+async def get_bidask(symbol, exchange, bidask="askPrice"):
+    info = (await exchange.fetch_bids_asks([symbol]))[symbol]["info"]
+    return float(info[bidask])
 
 
 async def get_symbol():
-    symbols = pd.DataFrame()
+    """
+    get top 10 volume symbol of the day
+    """
     symbolist = bot_setting()
     lastUpdate.status = "fecthing Symbol of Top 10 Volume..."
     exchange = await connect()
     try:
         market = await exchange.fetch_tickers(params={"type": "future"})
     except Exception as e:
-        lastUpdate.status = f"{e}"
-        await disconnect(exchange)
-        logging.info(e)
-        exchange = await connect()
+        print(e)
         market = await exchange.fetch_tickers(params={"type": "future"})
     await disconnect(exchange)
-    for x, y in market.items():  # pyright: ignore
-        if y["symbol"][len(y["symbol"]) - 4 : len(y["symbol"])] == "USDT":
-            symbols = symbols.append(y, ignore_index=True)
-    symbols = symbols.set_index("symbol")
-    symbols["datetime"] = pd.to_datetime(
-        symbols["timestamp"], unit="ms", utc=True
-    ).map(lambda x: x.tz_convert("Asia/Bangkok"))
-    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
-    symbols.drop(["timestamp", "high", "low", "average"], axis=1, inplace=True)
-    symbols.drop(
-        ["bid", "bidVolume", "ask", "askVolume"], axis=1, inplace=True
+    symbols = pd.DataFrame(
+        [
+            y
+            for x, y in market.items()
+            if x.endswith("USDT") or x.endswith("BUSD")
+        ]
     )
-    symbols.drop(["vwap", "open", "baseVolume", "info"], axis=1, inplace=True)
-    symbols.drop(["close", "previousClose", "datetime"], axis=1, inplace=True)
+    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
     symbols = symbols.head(10)
-    newsym = []
-    if len(symbolist.index) > 0:
+    newsym = [symbol for symbol in symbols["symbol"]]
+    if symbolist is not None and len(symbolist.index) > 0:
         for i in range(len(symbolist.index)):
             newsym.append(symbolist["symbol"][i])
-    for symbol in symbols.index:
-        newsym.append(symbol)
     newsym = list(dict.fromkeys(newsym))
     print(f"Interested : {newsym}")
     return newsym
@@ -123,108 +120,200 @@ async def getAllsymbol():
     """
     Get all symbols
     """
-    symbols = pd.DataFrame()
-    symbolist = bot_setting()
     exchange = await connect()
     try:
         market = await exchange.fetch_tickers(params={"type": "future"})
     except Exception as e:
+        print(e)
+        market = await exchange.fetch_tickers(params={"type": "future"})
+    await disconnect(exchange)
+    symbols = pd.DataFrame(
+        [
+            y
+            for x, y in market.items()
+            if x.endswith("USDT") or x.endswith("BUSD")
+        ]
+    )
+    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
+    return [symbol for symbol in symbols["symbol"]]
+
+
+async def fetching_candle_ohlc(symbol, timeframe, limits):
+    exchange = await connect()
+    try:
+        bars = await exchange.fetch_ohlcv(
+            symbol, timeframe=timeframe, since=None, limit=limits
+        )
+        await disconnect(exchange)
+        return bars
+    except Exception as e:
         lastUpdate.status = f"{e}"
         await disconnect(exchange)
 
-        logging.info(e)
         exchange = await connect()
-        market = await exchange.fetch_tickers(params={"type": "future"})
-    await disconnect(exchange)
-    for x, y in market.items():  # pyright: ignore
-        if y["symbol"][len(y["symbol"]) - 4 : len(y["symbol"])] == "USDT":
-            symbols = symbols.append(y, ignore_index=True)
-    symbols = symbols.set_index("symbol")
-    symbols["datetime"] = pd.to_datetime(
-        symbols["timestamp"], unit="ms", utc=True
-    ).map(lambda x: x.tz_convert("Asia/Bangkok"))
-    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
-    symbols.drop(["timestamp", "high", "low", "average"], axis=1, inplace=True)
-    symbols.drop(
-        ["bid", "bidVolume", "ask", "askVolume"], axis=1, inplace=True
-    )
-    symbols.drop(["vwap", "open", "baseVolume", "info"], axis=1, inplace=True)
-    symbols.drop(["close", "previousClose", "datetime"], axis=1, inplace=True)
-    newsym = []
-    if not symbolist.empty:
-        for i in range(len(symbolist.index)):
-            newsym.append(symbolist["symbol"][i])
-    for symbol in symbols.index:
-        newsym.append(symbol)
-    newsym = list(dict.fromkeys(newsym))
-    return newsym
+        bars = await exchange.fetch_ohlcv(
+            symbol, timeframe=timeframe, since=None, limit=limits
+        )
+        await disconnect(exchange)
+        return bars
 
 
 async def fetchbars(symbol, timeframe):
     """
     get candle from exchange
     """
-    exchange = await connect()
-    try:
-        bars = await exchange.fetch_ohlcv(
-            symbol, timeframe=timeframe, since=None, limit=barsC
+    if f"{symbol}{timeframe}" not in candle_ohlc.keys():
+        bars = await fetching_candle_ohlc(symbol, timeframe, barsC)
+        df = pd.DataFrame(
+            bars[:-1],
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
-    except Exception as e:
-        lastUpdate.status = f"{e}"
-        await disconnect(exchange)
-
-        logging.info(e)
-        exchange = await connect()
-        bars = await exchange.fetch_ohlcv(
-            symbol, timeframe=timeframe, since=None, limit=barsC
+        if timeframe == timer.min_timeframe:
+            timer.last_closed = int(df["timestamp"][len(df.index) - 1] / 1000)
+        df["timestamp"] = pd.to_datetime(
+            df["timestamp"], unit="ms", utc=True
+        ).map(lambda x: x.tz_convert("Asia/Bangkok"))
+        df = df.set_index("timestamp")
+        candle_ohlc.update({f"{symbol}{timeframe}": df})
+        return candle_ohlc[f"{symbol}{timeframe}"].copy()
+    else:
+        bars = await fetching_candle_ohlc(symbol, timeframe, 5)
+        df = pd.DataFrame(
+            bars[:-1],
+            columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
-    await disconnect(exchange)
-    df = pd.DataFrame(
-        bars[:-1],
-        columns=["timestamp", "open", "high", "low", "close", "volume"],
-    )
-    df["timestamp"] = pd.to_datetime(df["timestamp"], unit="ms", utc=True).map(
-        lambda x: x.tz_convert("Asia/Bangkok")
-    )
-    df = df.set_index("timestamp")
-    lastUpdate.candle = f"{dt.now().isoformat()}"
-    return df
+        df["timestamp"] = pd.to_datetime(
+            df["timestamp"], unit="ms", utc=True
+        ).map(lambda x: x.tz_convert("Asia/Bangkok"))
+        df = df.set_index("timestamp")
+        df = pd.concat(
+            [candle_ohlc[f"{symbol}{timeframe}"], df], ignore_index=False
+        )
+        candle_ohlc[f"{symbol}{timeframe}"] = df[
+            ~df.index.duplicated(keep="last")
+        ].tail(barsC)
+        return candle_ohlc[f"{symbol}{timeframe}"].copy()
 
 
 # set leverage pass
-async def setleverage(symbol, lev):
-    exchange = await connect_loads()
+async def setleverage(symbol, lev, exchange):
     try:
         await exchange.set_leverage(lev, symbol)
+        return lev
     except Exception as e:
-        lastUpdate.status = f"{e}"
-        await disconnect(exchange)
-        logging.info(e)
-        exchange = await connect_loads()
-    lever = await exchange.fetch_positions_risk([symbol])
-    for x in range(len(lever)):
-        if (lever[x]["symbol"]) == symbol:
-            lev = round(lever[x]["leverage"], 0)
-            await exchange.set_leverage(int(lev), symbol)
-            break
-    await disconnect(exchange)
-    return round(int(lev), 0)
+        print(e)
+        lever = await exchange.fetch_positions_risk([symbol])
+        for x in range(len(lever)):
+            if (lever[x]["symbol"]) == symbol:
+                lev = round(lever[x]["leverage"], 0)
+                await exchange.set_leverage(int(lev), symbol)
+                break
+        return round(int(lev), 0)
 
 
-def RR1(stop, side, price):
+def RR1(stop, side, price, symbol, exchange):
     if side:
         target = price * (1 + ((price - float(stop)) / price) * 1)
-        return target
+        return exchange.price_to_precision(symbol, target)
     elif not side:
         target = price * (1 - ((float(stop) - price) / price) * 1)
-        return target
+        return exchange.price_to_precision(symbol, target)
     else:
         return None
 
 
-async def USESLSHORT(
-    df, symbol, exchange, bid, amount, high, Sside, Tailing_SL
-):
+async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
+    try:
+        triggerPrice = RR1(low, True, ask, symbol, exchange)
+        if triggerPrice is None:
+            return
+        callbackrate = callbackRate(df, True)
+        if currentMode.dualSidePosition:
+            ordertailingSL = await exchange.create_order(
+                symbol,
+                "TRAILING_STOP_MARKET",
+                "sell",
+                amount,
+                params={
+                    "activationPrice": triggerPrice,
+                    "callbackRate": callbackrate,
+                    "positionSide": side,
+                },
+            )
+        else:
+            ordertailingSL = await exchange.create_order(
+                symbol,
+                "TRAILING_STOP_MARKET",
+                "sell",
+                amount,
+                params={
+                    "activationPrice": triggerPrice,
+                    "callbackRate": callbackrate,
+                    "positionSide": side,
+                },
+            )
+        print(ordertailingSL)
+        msg2 = (
+            "BINANCE:"
+            + f"\nCoin        : {symbol}"
+            + "\nStatus      : Tailing-StopLoss"
+            + f"\nAmount      : {amount}"
+            + f"\nCallbackRate: {callbackrate}%"
+            + f"\ntriggerPrice: {triggerPrice}"
+        )
+        notify_send(msg2)
+    except Exception as e:
+        lastUpdate.status = f"{e}"
+        notify_send(f"เกิดความผิดพลาดในการเข้า Order : Tailing Stop\n{e}")
+
+
+async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
+    try:
+        triggerPrice = RR1(high, False, bid, symbol, exchange)
+        if triggerPrice is None:
+            return
+        callbackrate = callbackRate(df, False)
+        if currentMode.dualSidePosition:
+            ordertailingSL = await exchange.create_order(
+                symbol,
+                "TRAILING_STOP_MARKET",
+                "buy",
+                amount,
+                params={
+                    "activationPrice": triggerPrice,
+                    "callbackRate": callbackrate,
+                    "positionSide": Sside,
+                },
+            )
+        else:
+            ordertailingSL = await exchange.create_order(
+                symbol,
+                "TRAILING_STOP_MARKET",
+                "buy",
+                amount,
+                params={
+                    "activationPrice": triggerPrice,
+                    "callbackRate": callbackrate,
+                    "reduceOnly": True,
+                    "positionSide": Sside,
+                },
+            )
+        print(ordertailingSL)
+        msg2 = (
+            "BINANCE:"
+            + f"\nCoin        : {symbol}"
+            + "\nStatus      : Tailing-StopLoss"
+            + f"\nAmount      : {amount}"
+            + f"\nCallbackRate: {callbackrate}%"
+            + f"\ntriggerPrice: {triggerPrice}"
+        )
+        notify_send(msg2)
+    except Exception as e:
+        lastUpdate.status = f"{e}"
+        notify_send(f"เกิดความผิดพลาดในการเข้า Order : Tailing Stop\n{e}")
+
+
+async def USESLSHORT(symbol, exchange, amount, high, Sside):
     try:
         if currentMode.dualSidePosition:
             orderSL = await exchange.create_order(
@@ -239,40 +328,7 @@ async def USESLSHORT(
                     "positionSide": Sside,
                 },
             )
-            msg = (
-                "BINANCE:"
-                + f"\nCoin        : {symbol}"
-                + "\nStatus      : Order-StopLoss"
-                + f"\nAmount      : {amount}"
-                + f"\nPrice       : {high}USDT"
-            )
-            notify_send(msg)
-            if Tailing_SL:
-                triggerPrice = RR1(high, False, bid)
-                if triggerPrice is None:
-                    return
-                callbackrate = callbackRate(df)
-                ordertailingSL = await exchange.create_order(
-                    symbol,
-                    "TRAILING_STOP_MARKET",
-                    "buy",
-                    amount,
-                    params={
-                        "activationPrice": triggerPrice,
-                        "callbackRate": callbackrate,
-                        "positionSide": Sside,
-                    },
-                )
-                msg2 = (
-                    "BINANCE:"
-                    + f"\nCoin        : {symbol}"
-                    + "\nStatus      : Tailing-StopLoss"
-                    + f"\nAmount      : {amount}"
-                    + f"\nCallbackRate: {callbackrate}%"
-                    + f"\ntriggerPrice: {triggerPrice}"
-                )
-                notify_send(msg2)
-                logging.info(ordertailingSL)
+            print(orderSL)
         else:
             orderSL = await exchange.create_order(
                 symbol,
@@ -287,53 +343,16 @@ async def USESLSHORT(
                     "positionSide": Sside,
                 },
             )
-            msg = (
-                "BINANCE:"
-                + f"\nCoin        : {symbol}"
-                + "\nStatus      : Order-StopLoss"
-                + f"\nAmount      : {amount}"
-                + f"\nPrice       : {high}USDT"
-            )
-            notify_send(msg)
-            if Tailing_SL:
-                triggerPrice = RR1(high, False, bid)
-                if triggerPrice is None:
-                    return
-                callbackrate = callbackRate(df)
-                ordertailingSL = await exchange.create_order(
-                    symbol,
-                    "TRAILING_STOP_MARKET",
-                    "buy",
-                    amount,
-                    params={
-                        "activationPrice": triggerPrice,
-                        "callbackRate": callbackrate,
-                        "reduceOnly": True,
-                        "positionSide": Sside,
-                    },
-                )
-                msg2 = (
-                    "BINANCE:"
-                    + f"\nCoin        : {symbol}"
-                    + "\nStatus      : Tailing-StopLoss"
-                    + f"\nAmount      : {amount}"
-                    + f"\nCallbackRate: {callbackrate}%"
-                    + f"\ntriggerPrice: {triggerPrice}"
-                )
-                notify_send(msg2)
-                logging.info(ordertailingSL)
-        logging.info(orderSL)
-        return
+        return high
     except Exception as e:
         lastUpdate.status = f"{e}"
         notify_send(
             "เกิดเตุการณืไม่คาดฝัน Order Stop Loss" + f"ทำรายการไม่สำเร็จ {e}"
         )
-        logging.info(e)
-    return
+        return 0.0
 
 
-async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
+async def USESLLONG(symbol, exchange, amount, low, side):
     try:
         if currentMode.dualSidePosition:
             orderSL = await exchange.create_order(
@@ -348,40 +367,6 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                     "positionSide": side,
                 },
             )
-            msg = (
-                "BINANCE:"
-                + f"\nCoin        : {symbol}"
-                + "\nStatus      : Order-StopLoss"
-                + f"\nAmount      : {amount}"
-                + f"\nPrice       : {low}USDT"
-            )
-            notify_send(msg)
-            if Tailing_SL:
-                triggerPrice = RR1(low, True, ask)
-                if triggerPrice is None:
-                    return
-                callbackrate = callbackRate(df)
-                ordertailingSL = await exchange.create_order(
-                    symbol,
-                    "TRAILING_STOP_MARKET",
-                    "sell",
-                    amount,
-                    params={
-                        "activationPrice": triggerPrice,
-                        "callbackRate": callbackrate,
-                        "positionSide": side,
-                    },
-                )
-                msg2 = (
-                    "BINANCE:"
-                    + f"\nCoin        : {symbol}"
-                    + "\nStatus      : Tailing-StopLoss"
-                    + f"\nAmount      : {amount}"
-                    + f"\nCallbackRate: {callbackrate}%"
-                    + f"\ntriggerPrice: {triggerPrice}"
-                )
-                notify_send(msg2)
-                logging.info(ordertailingSL)
         else:
             orderSL = await exchange.create_order(
                 symbol,
@@ -396,54 +381,21 @@ async def USESLLONG(df, symbol, exchange, ask, amount, low, side, Tailing_SL):
                     "positionSide": side,
                 },
             )
-            msg = (
-                "BINANCE:"
-                + f"\nCoin        : {symbol}"
-                + "\nStatus      : Order-StopLoss"
-                + f"\nAmount      : {amount}"
-                + f"\nPrice       : {low}USDT"
-            )
-            notify_send(msg)
-            if Tailing_SL:
-                triggerPrice = RR1(low, True, ask)
-                if triggerPrice is None:
-                    return
-                callbackrate = callbackRate(df)
-                ordertailingSL = await exchange.create_order(
-                    symbol,
-                    "TRAILING_STOP_MARKET",
-                    "sell",
-                    amount,
-                    params={
-                        "activationPrice": triggerPrice,
-                        "callbackRate": callbackrate,
-                        "positionSide": side,
-                    },
-                )
-                msg2 = (
-                    "BINANCE:"
-                    + f"\nCoin        : {symbol}"
-                    + "\nStatus      : Tailing-StopLoss"
-                    + f"\nAmount      : {amount}"
-                    + f"\nCallbackRate: {callbackrate}%"
-                    + f"\ntriggerPrice: {triggerPrice}"
-                )
-                notify_send(msg2)
-                logging.info(ordertailingSL)
-        logging.info(orderSL)
-        return
+        print(orderSL)
+        return low
     except Exception as e:
         lastUpdate.status = f"{e}"
-        notify_send("เกิดเตุการณืไม่คาดฝัน Order Stop Loss ทำรายการไม่สำเร็จ")
-        logging.info(e)
-    return
+        notify_send(f"เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ{e}")
+        return 0.0
 
 
 async def USETPLONG(
     symbol, df, exchange, ask, TPRR1, TPRR2, Lside, amttp1, amttp2, USETP2
 ):
     try:
-        stop_price = RRTP(df, True, 1, ask, TPRR1, TPRR2)
+        stop_price = exchange.price_to_precision(
+            symbol, RRTP(df, True, 1, ask, TPRR1, TPRR2)
+        )
         orderTP = await exchange.create_order(
             symbol,
             "TAKE_PROFIT_MARKET",
@@ -456,17 +408,11 @@ async def USETPLONG(
                 "positionSide": Lside,
             },
         )
-        msg = (
-            "BINANCE:"
-            + f"\nCoin        : {symbol}"
-            + "\nStatus      : Order-TP1"
-            + f"\nAmount      : {amttp1}"
-            + f"\nPrice       : {stop_price}USDT"
-        )
-        notify_send(msg)
-        logging.info(orderTP)
+        print(orderTP)
         if USETP2:
-            triggerPrice = RRTP(df, True, 2, ask, TPRR1, TPRR2)
+            triggerPrice = exchange.price_to_precision(
+                symbol, RRTP(df, True, 2, ask, TPRR1, TPRR2)
+            )
             orderTP2 = await exchange.create_order(
                 symbol,
                 "TAKE_PROFIT_MARKET",
@@ -479,21 +425,13 @@ async def USETPLONG(
                     "positionSide": Lside,
                 },
             )
-            msg2 = (
-                "BINANCE:"
-                + f"\nCoin        : {symbol}"
-                + "\nStatus      : Order-TP2"
-                + f"\nAmount      : {amttp2}"
-                + f"\nPrice       : {triggerPrice}"
-            )
-            notify_send(msg2)
-            logging.info(orderTP2)
-        return
+            print(orderTP2)
+            return [stop_price, triggerPrice]
+        return [stop_price]
     except Exception as e:
         lastUpdate.status = f"{e}"
-        notify_send("เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ")
-        logging.info(e)
-    return
+        notify_send(f"เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ{e}")
+        return None
 
 
 async def fetching_balance():
@@ -505,17 +443,22 @@ async def fetching_balance():
     except Exception as e:
         lastUpdate.status = f"{e}"
         await disconnect(exchange)
-        logging.info(e)
         exchange = await connect()
         balance = await exchange.fetch_balance()
         await disconnect(exchange)
         return balance
 
 
+async def fetching_fiat_balance():
+    balance = await fetching_balance()
+    return {x: y for x, y in balance.items() if x == "USDT" or x == "BUSD"}
+
+
 # Position Sizing
 def buysize(df, balance, symbol, exchange, RISK):
     last = len(df.index) - 1
-    freeusd = float(balance["free"]["USDT"])
+    quote = symbol[-4:]
+    freeusd = float(balance["free"][quote])
     low = float(df["lowest"][last])
     if RISK[0] == "$":
         risk = float(RISK[1 : len(RISK)])
@@ -531,7 +474,8 @@ def buysize(df, balance, symbol, exchange, RISK):
 
 def sellsize(df, balance, symbol, exchange, RISK):
     last = len(df.index) - 1
-    freeusd = float(balance["free"]["USDT"])
+    quote = symbol[-4:]
+    freeusd = float(balance["free"][quote])
     high = float(df["highest"][last])
     if RISK[0] == "$":
         risk = float(RISK[1 : len(RISK)])
@@ -547,8 +491,8 @@ def sellsize(df, balance, symbol, exchange, RISK):
 
 # OpenLong=Buy
 async def OpenLong(df, balance, risk_manage, Lside, min_balance):
+    exchange = await connect_loads()
     try:
-        exchange = await connect_loads()
         await exchange.cancel_all_orders(risk_manage["symbol"])
         amount = buysize(
             df,
@@ -562,27 +506,25 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
             (
                 data["limits"]["amount"]["min"]
                 for data in markets
-                if data["id"] == risk_manage["symbol"].replace("/", "")
+                if data["id"] == risk_manage["symbol"][:-5].replace("/", "")
             ).__next__()
         )
         if amount < min_amount:
             amount = min_amount
-        ask = await get_bidask(risk_manage["symbol"], "askPrice")
-        logging.info(
-            f"Entry Long {risk_manage['symbol']} Long @{ask} qmt:{amount}"
-        )
+        ask = await get_bidask(risk_manage["symbol"], exchange, "askPrice")
         leve = await setleverage(
-            risk_manage["symbol"], risk_manage["leverage"]
+            risk_manage["symbol"], risk_manage["leverage"], exchange
         )
         if amount * ask > risk_manage["max_size"] * int(leve):
             new_lots = risk_manage["max_size"] * int(leve) / ask
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
-        free = float(balance["free"]["USDT"])
+        free = float(risk_manage["free_balance"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
         amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
         low = df["lowest"][len(df.index) - 1]
+        quote = risk_manage["quote"]
         if free > min_balance:
             try:
                 order = await exchange.create_market_order(
@@ -591,13 +533,14 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
                     amount,
                     params={"positionSide": Lside},
                 )
-                logging.info(order)
+                print(order)
+                margin = ask * amount / int(leve)
+                total = float(balance["total"][quote])
             except ccxt.InsufficientFunds as e:
-                logging.info(e)
                 notify_send(e)
-                return
+                return await disconnect(exchange)
             if risk_manage["use_tp_1"]:
-                await USETPLONG(
+                tp12 = await USETPLONG(
                     risk_manage["symbol"],
                     df,
                     exchange,
@@ -610,7 +553,27 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
                     risk_manage["use_tp_2"],
                 )
             if risk_manage["use_sl"]:
-                await USESLLONG(
+                slprice = await USESLLONG(
+                    risk_manage["symbol"],
+                    exchange,
+                    amount,
+                    low,
+                    Lside,
+                )
+            msg = (
+                "BINANCE:"
+                + f"\nCoin        : {risk_manage['symbol']}"
+                + "\nStatus      : OpenLong[BUY]"
+                + f"\nAmount      : {amount}({round((amount * ask), 2)}{quote})"
+                + f"\nPrice       : {ask}{quote}"
+                + f"\nmargin      : {round(margin, 2)}{quote}"
+                + f"\nBalance     : {round(total, 2)}{quote}"
+                + f"\nTP Price    : {tp12}{quote}"
+                + f"\nSL Price    : {slprice}{quote}"
+            )
+            notify_send(msg)
+            if risk_manage["use_tailing"]:
+                await TailingLongOrder(
                     df,
                     risk_manage["symbol"],
                     exchange,
@@ -618,31 +581,31 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
                     amount,
                     low,
                     Lside,
-                    risk_manage["use_tailing"],
                 )
-            margin = ask * amount / int(leve)
-            total = float(balance["total"]["USDT"])
-            msg = (
-                "BINANCE:"
-                + f"\nCoin        : {risk_manage['symbol']}"
-                + "\nStatus      : OpenLong[BUY]"
-                + f"\nAmount      : {amount}({round((amount * ask), 2)}USDT)"
-                + f"\nPrice       : {ask}USDT"
-                + f"\nmargin      : {round(margin, 2)}USDT"
-                + f"\nBalance     : {round(total, 2)}USDT"
-            )
         else:
             msg = (
                 f"MARGIN-CALL!!!\nยอดเงินต่ำกว่าที่กำหนดไว้ :{min_balance}USD"
                 + f"\nยอดปัจจุบัน  {round(free, 2)}"
                 + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
             )
-        notify_send(msg)
-        candle(df, risk_manage["symbol"], risk_manage["timeframe"])
+            notify_send(msg)
+        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+        write_trade_record(
+            time_now,
+            risk_manage["symbol"],
+            amount,
+            ask,
+            "OpenLong[BUY]",
+            tp12,
+            slprice,
+        )
+        candle(
+            df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}"
+        )
         return await disconnect(exchange)
     except Exception as e:
+        print(e)
         lastUpdate.status = f"{e}"
-        logging.info(e)
         notify_send(f"เกิดความผิดพลาดในการเข้า Order : OpenLong\n {e}")
         return await disconnect(exchange)
 
@@ -651,7 +614,9 @@ async def USETPSHORT(
     symbol, df, exchange, bid, TPRR1, TPRR2, Sside, amttp1, amttp2, USETP2
 ):
     try:
-        triggerPrice = RRTP(df, False, 1, bid, TPRR1, TPRR2)
+        triggerPrice = exchange.price_to_precision(
+            symbol, RRTP(df, False, 1, bid, TPRR1, TPRR2)
+        )
         orderTP = await exchange.create_order(
             symbol,
             "TAKE_PROFIT_MARKET",
@@ -664,17 +629,11 @@ async def USETPSHORT(
                 "positionSide": Sside,
             },
         )
-        msg = (
-            "BINANCE:"
-            + f"\nCoin        : {symbol}"
-            + "\nStatus      : Order-TP1"
-            + f"\nAmount      : {amttp1}"
-            + f"\nPrice       : {triggerPrice}USDT"
-        )
-        notify_send(msg)
-        logging.info(orderTP)
+        print(orderTP)
         if USETP2:
-            triggerPrice2 = RRTP(df, False, 2, bid, TPRR1, TPRR2)
+            triggerPrice2 = exchange.price_to_precision(
+                symbol, RRTP(df, False, 2, bid, TPRR1, TPRR2)
+            )
             orderTP2 = await exchange.create_order(
                 symbol,
                 "TAKE_PROFIT_MARKET",
@@ -687,27 +646,19 @@ async def USETPSHORT(
                     "positionSide": Sside,
                 },
             )
-            msg2 = (
-                "BINANCE:"
-                + f"\nCoin        : {symbol}"
-                + "\nStatus      : Order-TP2"
-                + f"\nAmount      : {amttp2}"
-                + f"\nPrice       : {triggerPrice2}"
-            )
-            notify_send(msg2)
-            logging.info(orderTP2)
-        return
+            print(orderTP2)
+            return [triggerPrice, triggerPrice2]
+        return [triggerPrice]
     except Exception as e:
         lastUpdate.status = f"{e}"
         notify_send("เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ")
-        logging.info(e)
-    return
+        return None
 
 
 # OpenShort=Sell
 async def OpenShort(df, balance, risk_manage, Sside, min_balance):
+    exchange = await connect_loads()
     try:
-        exchange = await connect_loads()
         await exchange.cancel_all_orders(risk_manage["symbol"])
         amount = sellsize(
             df,
@@ -721,27 +672,25 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
             (
                 data["limits"]["amount"]["min"]
                 for data in markets
-                if data["id"] == risk_manage["symbol"].replace("/", "")
+                if data["id"] == risk_manage["symbol"][:-5].replace("/", "")
             ).__next__()
         )
         if amount < min_amount:
             amount = min_amount
-        bid = await get_bidask(risk_manage["symbol"], "bidPrice")
-        logging.info(
-            f"Entry Short {risk_manage['symbol']} Short @{bid} qmt:{amount}"
-        )
+        bid = await get_bidask(risk_manage["symbol"], exchange, "bidPrice")
         leve = await setleverage(
-            risk_manage["symbol"], risk_manage["leverage"]
+            risk_manage["symbol"], risk_manage["leverage"], exchange
         )
         if amount * bid > risk_manage["max_size"] * int(leve):
             new_lots = risk_manage["max_size"] * int(leve) / bid
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
-        free = float(balance["free"]["USDT"])
+        free = float(risk_manage["free_balance"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
         amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
         high = df["highest"][len(df.index) - 1]
+        quote = risk_manage["quote"]
         if free > min_balance:
             try:
                 order = await exchange.create_market_order(
@@ -750,24 +699,22 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
                     amount,
                     params={"positionSide": Sside},
                 )
-                logging.info(order)
+                print(order)
+                margin = bid * amount / int(leve)
+                total = float(balance["total"][quote])
             except ccxt.InsufficientFunds as e:
-                logging.info(e)
                 notify_send(e)
-                return
+                return await disconnect(exchange)
             if risk_manage["use_sl"]:
-                await USESLSHORT(
-                    df,
+                slprice = await USESLSHORT(
                     risk_manage["symbol"],
                     exchange,
-                    bid,
                     amount,
                     high,
                     Sside,
-                    risk_manage["use_tailing"],
                 )
             if risk_manage["use_tp_1"]:
-                await USETPSHORT(
+                tp12 = await USETPSHORT(
                     risk_manage["symbol"],
                     df,
                     exchange,
@@ -779,41 +726,63 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
                     amttp2,
                     risk_manage["use_tp_2"],
                 )
-            margin = bid * amount / int(leve)
-            total = float(balance["total"]["USDT"])
             msg = (
                 "BINANCE:"
                 + f"\nCoin        : {risk_manage['symbol']}"
                 + "\nStatus      : OpenShort[SELL]"
-                + f"\nAmount      : {amount}({round((amount * bid), 2)}USDT)"
-                + f"\nPrice       : {bid}USDT"
-                + f"\nmargin      : {round(margin, 2)}USDT"
-                + f"\nBalance     : {round(total, 2)}USDT"
+                + f"\nAmount      : {amount}({round((amount * bid), 2)}{quote})"
+                + f"\nPrice       : {bid}{quote}"
+                + f"\nmargin      : {round(margin, 2)}{quote}"
+                + f"\nBalance     : {round(total, 2)}{quote}"
+                + f"\nTP Price    : {tp12}{quote}"
+                + f"\nSL Price    : {slprice}{quote}"
             )
+            notify_send(msg)
+            if risk_manage["use_tailing"]:
+                await TailingShortOrder(
+                    df,
+                    risk_manage["symbol"],
+                    exchange,
+                    bid,
+                    amount,
+                    high,
+                    Sside,
+                )
         else:
             msg = (
                 f"MARGIN-CALL!!!\nยอดเงินต่ำกว่าที่กำหนดไว้ :{min_balance}USD"
                 + f"\nยอดปัจจุบัน  {round(free, 2)}"
                 + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
             )
-        notify_send(msg)
-        candle(df, risk_manage["symbol"], risk_manage["timeframe"])
+            notify_send(msg)
+        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+        write_trade_record(
+            time_now,
+            risk_manage["symbol"],
+            amount,
+            bid,
+            "OpenShort[SELL]",
+            tp12,
+            slprice,
+        )
+        candle(
+            df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}"
+        )
         return await disconnect(exchange)
     except Exception as e:
         lastUpdate.status = f"{e}"
-        logging.info(e)
         notify_send(f"เกิดความผิดพลาดในการเข้า Order : OpenShort\n{e}")
         return await disconnect(exchange)
 
 
 # CloseLong=Sell
 async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
+    exchange = await connect_loads()
     try:
-        exchange = await connect_loads()
         amount = abs(amt)
         upnl = pnl
-        bid = await get_bidask(symbol, "bidPrice")
-        logging.info(f"Close Long {symbol} @{bid} qmt:{amount}")
+        quote = symbol[-4:]
+        bid = await get_bidask(symbol, exchange, "bidPrice")
         try:
             order = await exchange.create_market_order(
                 symbol, "sell", amount, params={"positionSide": Lside}
@@ -821,24 +790,27 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
         except Exception as e:
             lastUpdate.status = f"{e}"
             await disconnect(exchange)
-            logging.info(e)
             exchange = await connect_loads()
             order = await exchange.create_market_order(
                 symbol, "sell", amount, params={"positionSide": Lside}
             )
-        logging.info(order)
-        total = float(balance["total"]["USDT"])
+            print(order)
+        total = float(balance["total"][quote])
         msg = (
             "BINANCE:\n"
             + f"Coin        : {symbol}\n"
             + "Status      : CloseLong[SELL]\n"
-            + f"Amount      : {str(amount)}({round((amount * bid), 2)}USDT)\n"
-            + f"Price       : {bid} USDT\n"
-            + f"Realized P/L:  {round(upnl, 2)}USDT\n"
-            + f"Balance     : {round(total, 2)}USDT"
+            + f"Amount      : {str(amount)}({round((amount * bid), 2)} {quote})\n"
+            + f"Price       : {bid} {quote}\n"
+            + f"Realized P/L:  {round(upnl, 2)} {quote}\n"
+            + f"Balance     : {round(total, 2)} {quote}"
         )
         notify_send(msg)
-        candle(df, symbol, tf)
+        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+        write_trade_record(
+            time_now, symbol, amount, bid, "CloseLong[SELL]", pnl=upnl
+        )
+        candle(df, symbol, f"{tf} {time_now}")
         return await disconnect(exchange)
     except Exception as e:
         lastUpdate.status = f"{e}"
@@ -851,9 +823,9 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
     try:
         exchange = await connect_loads()
         amount = abs(amt)
+        quote = symbol[-4:]
         upnl = pnl
-        ask = await get_bidask(symbol, "askPrice")
-        logging.info(f"Close Short {symbol}  @{ask} qmt:{amount}")
+        ask = await get_bidask(symbol, exchange, "askPrice")
         try:
             order = await exchange.create_market_order(
                 symbol, "buy", amount, params={"positionSide": Sside}
@@ -861,24 +833,27 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
         except Exception as e:
             lastUpdate.status = f"{e}"
             await disconnect(exchange)
-            logging.info(e)
             exchange = await connect_loads()
             order = await exchange.create_market_order(
                 symbol, "buy", amount, params={"positionSide": Sside}
             )
-        logging.info(order)
-        total = float(balance["total"]["USDT"])
+            print(order)
+        total = float(balance["total"][quote])
         msg = (
             "BINANCE:\n"
             f"Coin        : {symbol}\n"
             "Status      : CloseShort[BUY]\n"
-            f"Amount      : {str(amount)}({round((amount * ask), 2)}USDT)\n"
-            f"Price       : {ask} USDT\n"
-            f"Realized P/L:  {round(upnl, 2)}USDT\n"
-            f"Balance     : {round(total, 2)}USDT"
+            f"Amount      : {str(amount)}({round((amount * ask), 2)}{quote})\n"
+            f"Price       : {ask} {quote}\n"
+            f"Realized P/L:  {round(upnl, 2)}{quote}\n"
+            f"Balance     : {round(total, 2)}{quote}"
         )
         notify_send(msg)
-        candle(df, symbol, tf)
+        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+        write_trade_record(
+            time_now, symbol, amount, ask, "CloseShort[BUY]", pnl=upnl
+        )
+        candle(df, symbol, f"{tf} {time_now}")
         return await disconnect(exchange)
     except Exception as e:
         lastUpdate.status = f"{e}"
@@ -893,7 +868,6 @@ async def get_currentmode():
     except Exception as e:
         lastUpdate.status = f"{e}"
         await disconnect(exchange)
-        logging.info(e)
         exchange = await connect()
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
     await disconnect(exchange)
@@ -910,35 +884,69 @@ async def feed(
     min_balance,
     status,
 ):
-    is_in_Long = False
-    is_in_Short = False
-    is_in_position = False
-    amt = 0.0
-    upnl = 0.0
     posim = risk_manage["symbol"].replace("/", "")
     if status is None:
         return
-    for i in status.index:
-        if status["symbol"][i] == posim:
-            amt = float(status["positionAmt"][i])
-            upnl = float(status["unrealizedProfit"][i])
-            break
-    # NO Position
-    if not status.empty and amt != 0.0:
-        is_in_position = True
-    # Long position
-    if is_in_position and amt > 0.0:
-        is_in_Long = True
-        is_in_Short = False
-    # Short position
-    elif is_in_position and amt < 0.0:
-        is_in_Short = True
-        is_in_Long = False
+    status = status[status["symbol"] == posim]
+
+    if status.empty:
+        amt_short = 0.0
+        amt_long = 0.0
+        upnl_short = 0.0
+        upnl_long = 0.0
+    elif len(status.index) > 1:
+        amt_long = (
+            status["positionAmt"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "LONG"
+        ).__next__()
+        amt_short = (
+            status["positionAmt"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "SHORT"
+        ).__next__()
+        upnl_long = (
+            status["unrealizedProfit"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "LONG"
+        ).__next__()
+        upnl_short = (
+            status["unrealizedProfit"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "SHORT"
+        ).__next__()
     else:
-        is_in_position = False
-        is_in_Short = False
-        is_in_Long = False
+        amt = (
+            status["positionAmt"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+        ).__next__()
+        amt_long = amt if amt > 0.0 else 0.0
+        amt_short = amt if amt < 0.0 else 0.0
+        upnl = (
+            status["unrealizedProfit"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+        ).__next__()
+        upnl_long = upnl if amt != 0.0 else 0.0
+        upnl_short = upnl if amt != 0.0 else 0.0
+
+    is_in_Long = True if amt_long != 0.0 else False
+    is_in_Short = True if amt_short != 0.0 else False
+
     last = len(df.index) - 1
+    if (
+        df["isSL"][last] == 1
+        and f"{risk_manage['symbol']}{df.index.last()}"
+        not in alrnotify.symbols
+    ):
+        notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
+        alrnotify.symbols.append(f"{risk_manage['symbol']}{df.index.last()}")
+
     if df["BUY"][last] == 1:
         lastUpdate.status = "changed to Bullish, buy"
         if is_in_Short:
@@ -947,8 +955,8 @@ async def feed(
                 df,
                 balance,
                 risk_manage["symbol"],
-                amt,
-                upnl,
+                amt_short,
+                upnl_short,
                 currentMode.Sside,
                 risk_manage["timeframe"],
             )
@@ -983,8 +991,8 @@ async def feed(
                 df,
                 balance,
                 risk_manage["symbol"],
-                amt,
-                upnl,
+                amt_long,
+                upnl_long,
                 currentMode.Lside,
                 risk_manage["timeframe"],
             )

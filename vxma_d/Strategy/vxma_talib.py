@@ -213,7 +213,7 @@ class vxma:
         isSL = np.full(self.length, 0)
         BUY = np.full(self.length, 0)
         SELL = np.full(self.length, 0)
-        trend = np.full(self.length, 0)
+        trend = np.full(self.length, np.nan)
         vxma_ = self.data["vxma"]
         Close = self.close
         High = self.high
@@ -229,10 +229,10 @@ class vxma:
                 trend[i] = 0
             else:
                 if trend[i - 1] == 1 and Low[i] < slPrice[i - 1]:
-                    trend[i] = 0
+                    trend[i] = np.nan
                     isSL[i] = 1
                 elif trend[i - 1] == 0 and High[i] > slPrice[i - 1]:
-                    trend[i] = 0
+                    trend[i] = np.nan
                     isSL[i] = 1
                 else:
                     trend[i] = trend[i - 1]

@@ -1,13 +1,13 @@
 import asyncio
-import logging
 import time
 from uuid import uuid4
 import warnings
+from tabulate import tabulate
+from datetime import datetime
 
 import pandas as pd
-from tabulate import tabulate  # type: ignore
 
-from vxma_d.AppData import colorCS, lastUpdate
+from vxma_d.AppData import alrnotify, colorCS, lastUpdate, timer
 from vxma_d.AppData.Appdata import (
     AppConfig,
     RiskManageTable,
@@ -21,26 +21,16 @@ from vxma_d.MarketEX.CCXT_Binance import (
     feed,
     fetchbars,
     fetching_balance,
+    fetching_fiat_balance,
     getAllsymbol,
     get_currentmode,
     get_symbol,
 )
-
-have_talib = False
-try:
-    from vxma_d.Strategy.vxma_talib import vxma as ta
-
-    have_talib = True
-except Exception as e:  # noqa:
-    from vxma_d.Strategy.vxma_pandas_ta import vxma as ta
-
-    have_talib = False
-
-if have_talib:
-    from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
+from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
+from vxma_d.Strategy.vxma_talib import vxma as ta
 
 
-bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.1) github.com/vazw/vxma_web"
+bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.2) github.com/vazw/vxma_web"
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -70,6 +60,15 @@ TIMEFRAMES = [
     "1w",
     "1M",
 ]
+statcln = [
+    "symbol",
+    "entryPrice",
+    "positionSide",
+    "unrealizedProfit",
+    "positionAmt",
+    "initialMargin",
+    "leverage",
+]
 
 TIMEFRAMES_DICT = {
     "1m": "1m",
@@ -88,6 +87,22 @@ TIMEFRAMES_DICT = {
     "1w": "1w",
     "1M": "1M",
 }
+
+TIMEFRAME_SECONDS = {
+    "1m": 1,
+    "3m": 60 * 3,
+    "5m": 60 * 5,
+    "15m": 60 * 15,
+    "30m": 60 * 30,
+    "1h": 60 * 60,
+    "2h": 60 * 60 * 2,
+    "4h": 60 * 60 * 4,
+    "6h": 60 * 60 * 6,
+    "8h": 60 * 60 * 8,
+    "12h": 60 * 60 * 12,
+    "1d": 60 * 60 * 24,
+}
+
 
 common_names = {
     "symbol": "Symbols",
@@ -108,7 +123,6 @@ async def bot_1(symbol, ta_data, tf):
         return data1
     except Exception as e:
         lastUpdate.status = f"{e}"
-        logging.info(e)
         pass
 
 
@@ -120,7 +134,6 @@ async def bot_2(symbol, ta_data, tf):
         return data2
     except Exception as e:
         lastUpdate.status = f"{e}"
-        logging.info(e)
         pass
 
 
@@ -132,7 +145,6 @@ async def bot_3(symbol, ta_data, tf):
         return data3
     except Exception as e:
         lastUpdate.status = f"{e}"
-        logging.info(e)
         pass
 
 
@@ -177,7 +189,6 @@ async def scanSideway():
                     lastUpdate.status = f"Added {symbol} to list"
         except Exception as e:
             lastUpdate.status = f"{e}"
-            logging.info(e)
             pass
     return symbols
 
@@ -197,7 +208,8 @@ async def get_dailytasks():
             # candle(df2, symbol, "6h")
             # candle(df3, symbol, "1h")
             if df1 is not None:
-                candle(df1, symbol, "1d")
+                time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+                candle(df1, symbol, f"1d {time_now}")
                 long_term = ta_score(df1)
                 mid_term = ta_score(df2)
                 short_term = ta_score(df3)
@@ -213,7 +225,6 @@ async def get_dailytasks():
                 )
         except Exception as e:
             lastUpdate.status = f"{e}"
-            logging.info(e)
             pass
 
 
@@ -221,11 +232,20 @@ def remove_last_line_from_string(text):
     return text[: text.rfind("\n")]
 
 
-def hourly_report(balance):
+async def hourly_report():
+    balance = await fetching_fiat_balance()
+    lastUpdate.balance = balance
     lastUpdate.status = "Hourly report"
-    total = round(float(balance["total"]["USDT"]), 2)
-    msg = f"Total Balance : {total} USDT"
-    notify_send(msg, sticker=10863, package=789)
+    msg = (
+        "Balance Report\n BUSD"
+        + f"\nFree   : {round(balance['BUSD']['free'],2)}$"
+        + f"\nMargin : {round(balance['BUSD']['used'],2)}$"
+        + f"\nTotal  : {round(balance['BUSD']['total'],2)}$\nUSDT"
+        + f"\nFree   : {round(balance['USDT']['free'],2)}$"
+        + f"\nMargin : {round(balance['USDT']['used'],2)}$"
+        + f"\nTotal  : {round(balance['USDT']['total'],2)}$"
+    )
+    notify_send(msg)
     insession["hour"] = True
 
 
@@ -242,29 +262,19 @@ async def dailyreport():
             notify_send(msg=msg1)
         balance = await fetching_balance()
         positions = balance["info"]["positions"]
-        current_positions = [
-            position
-            for position in positions
-            if float(position["positionAmt"]) != 0
-        ]
         status = pd.DataFrame(
-            current_positions,
-            columns=[
-                "symbol",
-                "entryPrice",
-                "positionSide",
-                "unrealizedProfit",
-                "positionAmt",
-                "initialMargin",
+            [
+                position
+                for position in positions
+                if float(position["positionAmt"]) != 0
             ],
+            columns=statcln,
         )
         margin = float((status["initialMargin"]).astype("float64").sum())
         netunpl = float((status["unrealizedProfit"]).astype("float64").sum())
         print(f"Margin Used : {margin}")
         print(f"NET unrealizedProfit : {netunpl}")
-        status = status.sort_values(
-            by=["unrealizedProfit"], ascending=False
-        ).set_index("symbol")
+        status = status.sort_values(by=["unrealizedProfit"], ascending=False)
         status = status.head(1)
         firstline = (status.index)[0]
         upnl = round(
@@ -289,172 +299,178 @@ async def dailyreport():
     except Exception as e:
         notify_send(f"เกิดความผิดพลาดในส่วนของแจ้งเตือนรายวัน {e}")
         lastUpdate.status = f"{e}"
-        logging.info(e)
         return
 
 
 async def running_module():
     lastUpdate.status = "Loading..."
     symbolist = bot_setting()
-    seconds = time.time()
-    local_time = time.ctime(seconds)
-    if str(local_time[14:-9]) == "1":
-        insession["day"] = False
-        insession["hour"] = False
-    if str(local_time[11:-9]) == "07:0" and not insession["day"]:
-        insession["day"] = True
-        insession["hour"] = True
-        if have_talib:
-            await asyncio.gather(dailyreport())
-    if not symbolist.empty:
-        balance = await fetching_balance()
-        if str(local_time[14:-9]) == "0" and not insession["hour"]:
-            hourly_report(balance)
-        free_balance = float(balance["free"]["USDT"])
-        lastUpdate.balance = round(float(balance["total"]["USDT"]), 2)
-        for i in symbolist.index:
-            try:
 
-                ta_table_data = TATable(
-                    atr_p=symbolist["ATR"][i],
-                    atr_m=symbolist["ATR_m"][i],
-                    ema=symbolist["EMA"][i],
-                    linear=symbolist["subhag"][i],
-                    smooth=symbolist["smooth"][i],
-                    rsi=symbolist["RSI"][i],
-                    aol=symbolist["Andean"][i],
-                    pivot=symbolist["Pivot"][i],
-                )
-                risk_manage_data = RiskManageTable(symbolist, i, free_balance)
-                lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
-                data = await bot_1(
-                    risk_manage_data.symbol,
-                    ta_table_data.__dict__,
-                    risk_manage_data.timeframe,
-                )
-                positions = balance["info"]["positions"]
-                current_positions = [
+    if symbolist is None or symbolist.empty:
+        lastUpdate.status = "Idle"
+        await asyncio.sleep(60)
+        return
+
+    balance = await fetching_balance()
+
+    for i in symbolist.index:
+        try:
+
+            ta_table_data = TATable(
+                atr_p=symbolist["ATR"][i],
+                atr_m=symbolist["ATR_m"][i],
+                ema=symbolist["EMA"][i],
+                linear=symbolist["subhag"][i],
+                smooth=symbolist["smooth"][i],
+                rsi=symbolist["RSI"][i],
+                aol=symbolist["Andean"][i],
+                pivot=symbolist["Pivot"][i],
+            )
+
+            risk_manage_data = RiskManageTable(symbolist, i, balance)
+            lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
+
+            data = await bot_1(
+                risk_manage_data.symbol,
+                ta_table_data.__dict__,
+                risk_manage_data.timeframe,
+            )
+
+            positions = balance["info"]["positions"]
+            status = pd.DataFrame(
+                [
                     position
                     for position in positions
                     if float(position["positionAmt"]) != 0
-                ]
-                status = pd.DataFrame(
-                    current_positions,
-                    columns=[
-                        "symbol",
-                        "entryPrice",
-                        "positionSide",
-                        "unrealizedProfit",
-                        "positionAmt",
-                        "initialMargin",
-                        "leverage",
-                    ],
-                )
-                margin = 0.0
-                netunpl = 0.0
-                config = AppConfig()
-                max_margin = config.max_margin
-                min_balance = config.min_balance
-                margin = float(
-                    (status["initialMargin"]).astype("float64").sum()
-                )
-                netunpl = float(
-                    (status["unrealizedProfit"]).astype("float64").sum()
-                )
-                if margin > max_margin:
-                    notify_send(
-                        "Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
-                        f"ที่กำหนดไว้ : {max_margin}",
-                        sticker=17857,
-                        package=1070,
-                    )
-                    return
-                await asyncio.sleep(50 / 1000)
-                await asyncio.gather(
-                    feed(
-                        data,
-                        risk_manage_data.__dict__,
-                        balance,
-                        min_balance,
-                        status,
-                    )
-                )
+                ],
+                columns=statcln,
+            )
 
-            except Exception as e:
-                lastUpdate.status = f"{e}"
-                logging.info(e)
-                pass
+            margin = 0.0
+            config = AppConfig()
+            max_margin = config.max_margin
+            min_balance = config.min_balance
+            margin = float((status["initialMargin"]).astype("float64").sum())
 
-        clearconsol()
-        status["unrealizedProfit"] = (
-            (status["unrealizedProfit"]).astype("float64").round(2)
+            if margin > max_margin:
+                notify_send(
+                    f"Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
+                    f"ที่กำหนดไว้ : {max_margin}",
+                    sticker=17857,
+                    package=1070,
+                )
+                return
+
+            await asyncio.gather(
+                feed(
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    min_balance,
+                    status,
+                )
+            )
+
+        except Exception as e:
+            lastUpdate.status = f"{e}"
+            pass
+
+    # await asyncio.sleep(30)
+
+
+async def waiting():
+    text_time = f"{colorCS.CYELLOW} เวลา {colorCS.CGREEN}"
+    time_now = f"{(lastUpdate.candle)[:-10].replace('T',text_time)}"
+    balance = await fetching_balance()
+    positions = balance["info"]["positions"]
+    status = pd.DataFrame(
+        [
+            position
+            for position in positions
+            if float(position["positionAmt"]) != 0
+        ],
+        columns=statcln,
+    )
+    status["unrealizedProfit"] = (
+        (status["unrealizedProfit"]).astype("float64").round(2)
+    )
+
+    status["initialMargin"] = (status["initialMargin"]).astype("float64")
+    margin = float((status["initialMargin"]).astype("float64").sum())
+    netunpl = float((status["unrealizedProfit"]).astype("float64").sum())
+    status.rename(columns=common_names, errors="ignore", inplace=True)
+    print(tabulate(status, showindex=False, headers="keys"))
+    try:
+        print(
+            f"Margin Used : {colorCS.CBOLD + colorCS.CRED}{round(margin, 3)} ${colorCS.CEND}"  # noqa:
+            + f"  NET P/L : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
+            + f" Balance : BUSD {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance['BUSD']} ${colorCS.CEND}"  # noqa:
+            + f" USDT {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance['USDT']} ${colorCS.CEND}"  # noqa:
         )
-        status["initialMargin"] = (
-            (status["initialMargin"]).astype("float64").round(2)
-        )
-        status.rename(columns=common_names, errors="ignore", inplace=True)
-        print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
-        print(tabulate(status, showindex=False, headers="keys"))
+    except Exception:  # noqa:
         print(
             f"Margin Used : {colorCS.CBOLD + colorCS.CRED}{round(margin, 3)} ${colorCS.CEND}"  # noqa:
             + f"  NET P/L : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
             + f" Balance : {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance} ${colorCS.CEND}"  # noqa:
         )
-        lastUpdate.status = "idle"
-        await asyncio.sleep(30)
-    else:
-        lastUpdate.status = "idle"
-        await asyncio.sleep(60)
+    print(
+        "\r"
+        + colorCS.CRED
+        + colorCS.CBOLD
+        + f"Update : {colorCS.CGREEN}"
+        + time_now
+        + colorCS.CRED
+        + f"{colorCS.CRED} Status : "
+        + colorCS.CEND
+        + f"{lastUpdate.status}",
+        end="\r",
+    )
 
 
-async def waiting():
-    count = 0
-    status = [
-        "[        ]Latest",
-        "[=       ]lAtest",
-        "[===     ]laTest",
-        "[====    ]latEst",
-        "[=====   ]lateSt",
-        "[======  ]latesT",
-        "[======= ]latest",
-        "[========]Latest",
-        "[ =======]lAtest",
-        "[  ======]laTest",
-        "[   =====]latEst",
-        "[    ====]lateSt",
-        "[     ===]latesT",
-        "[      ==]latest",
-        "[       =]latest",
-    ]
-    while True:
-        await asyncio.sleep(0.2)
-        text_time = f"{colorCS.CYELLOW} เวลา {colorCS.CGREEN}"
-        time_now = f"{(lastUpdate.candle)[:-10].replace('T',text_time)}"
-        status_text = f"{lastUpdate.status}"
-        print(
-            "\r"
-            + colorCS.CRED
-            + colorCS.CBOLD
-            + status[count % len(status)]
-            + f" update : {colorCS.CGREEN}"
-            + time_now
-            + colorCS.CRED
-            + f"{colorCS.CRED} Status : "
-            + colorCS.CEND
-            + status_text[0:27],
-            end="",
-        )
-        count += 1
-        count = count % len(status)
+async def get_waiting_time():
+    symbolist = bot_setting()
+    timer.min_timewait = min(
+        TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
+    )
+    timer.min_timeframe = next(
+        i
+        for i in symbolist["timeframe"]
+        if TIMEFRAME_SECONDS[i] == timer.min_timewait
+    )
+    lastUpdate.candle = f"{datetime.now().isoformat()}"
+    await running_module()
+    timer.next_candle = timer.last_closed + timer.min_timewait
 
 
 async def warper_fn():
     while True:
         try:
-            await running_module()
+            local_time = time.ctime(time.time())
+
+            if str(local_time[14:-9]) == "1":
+                insession["day"] = False
+                insession["hour"] = False
+            if str(local_time[11:-9]) == "07:0" and not insession["day"]:
+                insession["day"] = True
+                insession["hour"] = True
+                alrnotify.symbols = []
+                await asyncio.gather(dailyreport())
+
+            if str(local_time[14:-9]) == "0" and not insession["hour"]:
+                await hourly_report()
+                await waiting()
+
+            t1 = time.time()
+            if t1 >= timer.next_candle:
+                lastUpdate.candle = f"{datetime.now().isoformat()}"
+                await running_module()
+                timer.next_candle += timer.min_timewait
+            else:
+                await asyncio.sleep(timer.next_candle - t1)
+
         except Exception as e:
             lastUpdate.status = f"{e}"
-            logging.info(e)
+            print(e)
             notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
             lastUpdate.status = "Sleep Mode"
             await asyncio.sleep(60)
@@ -465,11 +481,17 @@ async def warper_fn():
 
 
 async def run_bot():
+    print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
+    config = AppConfig()
+    if config.notify_token == "":
+        asyncio.sleep(60)
+        return
     try:
         await get_currentmode()
-        await asyncio.gather(warper_fn(), waiting())
+        await get_waiting_time()
+        await waiting()
+        await asyncio.gather(warper_fn())
     except Exception as e:
-        logging.info(e)
-        notify_send("บอทเข้าสู่สถานะ Fallback Mode")
+        notify_send(f"บอทเข้าสู่สถานะ Fallback Mode\n{e}")
         lastUpdate.status = "Fallback Mode : Restarting..."
         return

@@ -32,5 +32,5 @@ def main():
 
 
 if __name__ == "__main__":
-    print(f"{colorCS.CGREEN}Starting VXMA Bot Trading by Vaz{colorCS.CEND}")
+    print(f"{colorCS.CGREEN}Starting{colorCS.CEND}")
     main()

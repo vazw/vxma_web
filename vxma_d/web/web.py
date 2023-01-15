@@ -6,21 +6,17 @@
 # vazw wrote this file. As long as you retain this notice you
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer or coffee in return
-import logging
 import os
 import sqlite3
 import time
 import warnings
-import math
 from uuid import uuid4
-from datetime import datetime, date
 
 import ccxt
 import dash_bootstrap_components as dbc
 import dash_mantine_components as dmc
 import pandas as pd
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 from dash import (
     CeleryManager,
     Dash,
@@ -40,12 +36,7 @@ from vxma_d.AppData.Appdata import (
     notify_send,
     perf,
 )
-
-try:
-    from vxma_d.Strategy.vxma_talib import vxma as indi
-except Exception as e:
-    print(e)
-    from vxma_d.Strategy.vxma_pandas_ta import vxma as indi
+from vxma_d.Strategy.vxma_talib import vxma as indi
 
 
 launch_uid = uuid4()
@@ -76,11 +67,6 @@ else:
 
 # LINE_TOKEN = str(os.environ["Line_Notify_Token"])
 # notify = LineNotify(LINE_TOKEN)
-
-
-logging.basicConfig(
-    filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
-)
 
 
 websession = dict(name=False, day=False, hour=False)
@@ -135,31 +121,21 @@ nomEX = ccxt.binance(
 
 
 def makepairlist():
-    symbols = pd.DataFrame()
     try:
         market = nomEX.fetch_tickers(params={"type": "future"})
     except Exception as e:
         print(e)
         time.sleep(2)
         market = nomEX.fetch_tickers(params={"type": "future"})
-    for x, y in market.items():
-        if y["symbol"][len(y["symbol"]) - 4 : len(y["symbol"])] == "USDT":
-            symbols = symbols.append(y, ignore_index=True)
-    symbols = symbols.set_index("symbol")
-    symbols["datetime"] = pd.to_datetime(
-        symbols["timestamp"], unit="ms", utc=True
-    ).map(lambda x: x.tz_convert("Asia/Bangkok"))
-    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
-    symbols.drop(["timestamp", "high", "low", "average"], axis=1, inplace=True)
-    symbols.drop(
-        ["bid", "bidVolume", "ask", "askVolume"], axis=1, inplace=True
+    symbols = pd.DataFrame(
+        [
+            y
+            for x, y in market.items()
+            if x.endswith("USDT") or x.endswith("BUSD")
+        ]
     )
-    symbols.drop(["vwap", "open", "baseVolume", "info"], axis=1, inplace=True)
-    symbols.drop(["close", "previousClose", "datetime"], axis=1, inplace=True)
-    newsym = []
-    for symbol in symbols.index:
-        newsym.append(symbol)
-    return newsym
+    symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
+    return [symbol for symbol in symbols["symbol"]]
 
 
 # HTML COMPONENT
@@ -177,16 +153,19 @@ option_input = dmc.Group(
         ),
     ],
 )
-pairlist = makepairlist()
+
 symbol_dropdown = dmc.Select(
-    data=[{"label": symbol, "value": symbol} for symbol in pairlist],
+    data=[
+        {"label": symbol[:-5], "value": symbol} for symbol in makepairlist()
+    ],
     label="Symbol/Pair",
     id="symbol-dropdown",
     searchable=True,
-    value="BTC/USDT",
+    value="BTC/USDT:USDT",
     clearable=False,
     style={"width": 120},
 )
+
 timeframe_dropdown = dmc.Select(
     data=[
         {"label": timeframe, "value": timeframe} for timeframe in TIMEFRAMES
@@ -483,6 +462,14 @@ edit_table = dcc.ConfirmDialogProvider(
     submit_n_clicks=0,
 )
 
+refresh_history = dmc.Button(
+    "Refresh",
+    variant="light",
+    id="refresh-history",
+    color="green",
+    n_clicks=0,
+    size="md",
+)
 refresh_table = dmc.Button(
     "Refresh",
     variant="light",
@@ -557,6 +544,40 @@ login_page = dmc.Center(
     ]
 )
 
+tradehistory = dmc.Container(
+    [
+        html.Hr(),
+        dbc.Row([dmc.Center([dmc.Table(id="history-table")])]),
+        dmc.Grid(
+            [
+                dmc.Col(
+                    [
+                        refresh_history,
+                    ],
+                    span=1,
+                ),
+            ],
+            justify="space-between",
+            align="flex-start",
+            gutter="md",
+            grow=True,
+        ),
+        html.Hr(),
+        dbc.Row(
+            [
+                dmc.Paper(
+                    children=[
+                        dmc.Text(
+                            "by Vaz. Donate : XMR : 87tT3DZqi4mhGuJjEp3Yebi1Wa13Ne6J7RGi9QxU21FkcGGNtFHkfdyLjaPLRv8T2CMrz264iPYQ2dCsJs2MGJ27GnoJFbm",  # noqa:
+                            size="xs",
+                        )
+                    ],
+                    shadow="xs",
+                )
+            ]
+        ),
+    ]
+)
 
 Summary_page = dmc.Container(
     [
@@ -614,61 +635,6 @@ Summary_page = dmc.Container(
 
 vxma_page = dmc.Container(
     [
-        dmc.Grid(
-            [
-                dmc.Col(
-                    [
-                        option_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col(
-                    [
-                        Margin_input,
-                        RRTP1_input,
-                        RRTP2_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col([RISK_input, perTP1_input, perTP2_input], span=1),
-                dmc.Col(
-                    [
-                        Leverage_input,
-                        atr_input,
-                        atrm_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col(
-                    [
-                        Pivot_input,
-                        RSI_input,
-                        EMA_input,
-                    ],
-                    span=1,
-                ),
-                dmc.Col([AOL_input, SUBHAG_input, SMOOTH_input], span=1),
-                dmc.Col(
-                    [
-                        dmc.Stack(
-                            [
-                                symbol_dropdown,
-                                Apply_input,
-                                ready_input,
-                                Runbot_input,
-                            ],
-                            align="flex-start",
-                            spacing="xs",
-                        ),
-                    ],
-                    span=1,
-                ),
-            ],
-            justify="space-between",
-            align="flex-start",
-            gutter="md",
-            grow=True,
-        ),
         html.Hr(),
         dbc.Row(
             [
@@ -683,15 +649,68 @@ vxma_page = dmc.Container(
                     [
                         dmc.Col(
                             [
-                                html.H5(
-                                    "ตรวจดูตั้งค่าทุกครั้ง!!",
-                                    style={"color": "red"},
-                                )
+                                option_input,
                             ],
                             span=1,
                         ),
                         dmc.Col(
                             [
+                                Margin_input,
+                                RRTP1_input,
+                                RRTP2_input,
+                            ],
+                            span=1,
+                        ),
+                        dmc.Col(
+                            [RISK_input, perTP1_input, perTP2_input], span=1
+                        ),
+                        dmc.Col(
+                            [
+                                Leverage_input,
+                                atr_input,
+                                atrm_input,
+                            ],
+                            span=1,
+                        ),
+                        dmc.Col(
+                            [
+                                Pivot_input,
+                                RSI_input,
+                                EMA_input,
+                            ],
+                            span=1,
+                        ),
+                        dmc.Col(
+                            [AOL_input, SUBHAG_input, SMOOTH_input], span=1
+                        ),
+                        dmc.Col(
+                            [
+                                dmc.Stack(
+                                    [
+                                        symbol_dropdown,
+                                        timeframe_dropdown,
+                                        num_bars_input,
+                                    ],
+                                    align="flex-start",
+                                    spacing="xs",
+                                ),
+                            ],
+                            span=1,
+                        ),
+                    ],
+                    justify="space-between",
+                    align="flex-start",
+                    gutter="md",
+                    grow=True,
+                ),
+                dmc.Grid(
+                    [
+                        dmc.Col(
+                            [
+                                html.P(
+                                    "ตรวจดูตั้งค่าทุกครั้ง!!",
+                                    style={"color": "red"},
+                                ),
                                 html.Div(id="alert-suc"),
                             ],
                             span=1,
@@ -699,10 +718,41 @@ vxma_page = dmc.Container(
                         dmc.Col(
                             [
                                 dmc.Group(
-                                    [timeframe_dropdown, num_bars_input]
+                                    [
+                                        dmc.Grid(
+                                            [
+                                                dmc.Col(
+                                                    [
+                                                        Apply_input,
+                                                    ],
+                                                    span=1,
+                                                )
+                                            ]
+                                        ),
+                                        dmc.Grid(
+                                            [
+                                                dmc.Col(
+                                                    [
+                                                        ready_input,
+                                                    ],
+                                                    span=1,
+                                                )
+                                            ]
+                                        ),
+                                        dmc.Grid(
+                                            [
+                                                dmc.Col(
+                                                    [
+                                                        Runbot_input,
+                                                    ],
+                                                    span=1,
+                                                )
+                                            ]
+                                        ),
+                                    ]
                                 ),
                             ],
-                            span=1,
+                            span=3,
                             offset=1,
                         ),
                     ],
@@ -710,7 +760,7 @@ vxma_page = dmc.Container(
                     align="flex-end",
                     gutter="md",
                     grow=True,
-                )
+                ),
             ]
         ),
         html.Hr(),
@@ -1027,6 +1077,7 @@ index_page = dmc.MantineProvider(
                 dmc.TabsList(
                     [
                         dmc.Tab("Summary", value="sumarry"),
+                        dmc.Tab("Trading History", value="history-page"),
                         dmc.Tab("VXMA bot", value="vxma"),
                         # dmc.Tab("EMA bot", value="ema"),
                         dmc.Tab("Running Bot", value="running"),
@@ -1036,6 +1087,7 @@ index_page = dmc.MantineProvider(
                     position="right",
                 ),
                 dmc.TabsPanel(Summary_page, value="sumarry"),
+                dmc.TabsPanel(tradehistory, value="history-page"),
                 dmc.TabsPanel(vxma_page, value="vxma"),
                 # dmc.TabsPanel(EMA_page, value="ema"),
                 dmc.TabsPanel(RunningBot_page, value="running"),
@@ -1165,7 +1217,6 @@ def update_VXMA_chart(
         )
     except Exception as e:
         print(e)
-        logging.info(e)
         time.sleep(2)
         bars = nomEX.fetch_ohlcv(
             symbol, timeframe=timeframe, since=None, limit=barsC
@@ -1662,7 +1713,6 @@ def resetpwd(click, pwd1, pwd2, id):
                 ]
             except Exception as e:
                 print(e)
-                logging.info(e)
                 return [
                     dbc.Alert(
                         "Ops! Something went wrong, Please retry.",
@@ -1711,9 +1761,9 @@ def runningBot(click):
             editable=True,
             id="datatable",
             style_table={"color": "black"},
+            persistence=True,
+            persisted_props=["data"],
         )
-    else:
-        return PreventUpdate
 
 
 # #write data edit running bot
@@ -1771,3 +1821,22 @@ def edit_menu(click, rows, ready):
                 color="danger",
             )
         ]
+
+
+@app.callback(
+    Output("history-table", "children"),
+    Input("refresh-history", "n_clicks"),
+)
+def history_table(click):
+    if click is not None:
+        symbolist = pd.read_csv("trades.csv")
+        return dash_table.DataTable(
+            data=symbolist.to_dict("records"),
+            columns=[{"name": i, "id": i} for i in symbolist],
+            page_current=0,
+            page_size=99,
+            page_action="custom",
+            editable=True,
+            id="history-table",
+            style_table={"color": "black"},
+        )

@@ -12,7 +12,6 @@
 #     0. You just DO WHAT THE FUCK YOU WANT TO.
 
 import asyncio
-import datetime
 
 import ccxt.async_support as ccxt
 import moment
@@ -40,10 +39,10 @@ async def fetching_candle(symbol: str, timeframe: str) -> pd.DataFrame:
     )
     needed_candle = TIMEFRAME_SECONDS[f"{timeframe}"] * -200000
     milisec_step = TIMEFRAME_SECONDS[f"{timeframe}"] * 1000
+    exchange = ccxt.binance()
     for seconds in range(needed_candle, 0, milisec_step):
         try:
             await asyncio.sleep(50 / 100)
-            exchange = ccxt.binance()
             currentDay = moment.utcnow()
             timeInepoch = currentDay.add(seconds=seconds).epoch(
                 milliseconds=True
@@ -68,7 +67,6 @@ async def fetching_candle(symbol: str, timeframe: str) -> pd.DataFrame:
             ).map(lambda x: x.tz_convert("Asia/Bangkok"))
             df = pd.concat([df, data], axis=0, ignore_index=True)
             print(df)
-            await exchange.close()
         except Exception as e:
             print(e)
             await exchange.close()
@@ -76,6 +74,7 @@ async def fetching_candle(symbol: str, timeframe: str) -> pd.DataFrame:
             timeInepoch = currentDay.add(seconds=seconds).epoch(
                 milliseconds=True
             )
+
             timeInepoch = None if seconds >= 0 else timeInepoch
             bars = await exchange.fetch_ohlcv(
                 symbol, timeframe, timeInepoch, 1000

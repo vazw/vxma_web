@@ -7,7 +7,7 @@
 # can do whatever you want with this stuff. If we meet some day, and you think
 # this stuff is worth it, you can buy me a beer or coffee in return
 
-import logging
+from datetime import datetime
 import os
 import sqlite3
 from dataclasses import dataclass
@@ -18,6 +18,7 @@ import pandas as pd
 from line_notify import LineNotify
 
 barsC = 1502
+
 
 rcs = {
     "axes.labelcolor": "white",
@@ -75,41 +76,51 @@ BOTCOL = [
     "maxMargin",
 ]
 
-logging.basicConfig(
-    filename="log.log", format="%(asctime)s - %(message)s", level=logging.INFO
-)
 
-
-def bot_setting():
-    symbolist = pd.read_csv("bot_config.csv")
-    return symbolist
+def bot_setting() -> pd.DataFrame:
+    try:
+        symbolist = pd.read_csv("bot_config.csv")
+        return symbolist
+    except Exception as e:
+        print(e)
+        return pd.DataFrame()
 
 
 def config_setting():
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
-        config = pd.read_sql("SELECT * FROM key", con=con)
-    return config
+    try:
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            config = pd.read_sql("SELECT * FROM key", con=con)
+        return config
+    except Exception as e:
+        print(e)
+        return None
 
 
 def cooking(id, pwd):
-    pepper = f"{id}{pwd}!{barsC}vz{id}"
-    bytePwd = pepper.encode("utf-8")
-    Salt = bcrypt.gensalt(rounds=12)
-    cook = bcrypt.hashpw(bytePwd, Salt)
-    return cook
+    try:
+        pepper = f"{id}{pwd}!{barsC}vz{id}"
+        bytePwd = pepper.encode("utf-8")
+        Salt = bcrypt.gensalt(rounds=12)
+        return bcrypt.hashpw(bytePwd, Salt)
+    except Exception as e:
+        print(e)
+        return None
 
 
 def perf(id, pwd):
     hash1 = "X"
-    with sqlite3.connect("vxma.db", check_same_thread=False) as con:
-        bata = pd.read_sql("SELECT * FROM user", con=con)
-    iid = bata["id"][0]
-    if iid == id:
-        hash1 = bata["pass"][0]
-    egg = f"{id}{pwd}!{barsC}vz{id}"
-    bytePwd = egg.encode("utf-8")
-    proof = bcrypt.checkpw(bytePwd, hash1)
-    return proof
+    try:
+        with sqlite3.connect("vxma.db", check_same_thread=False) as con:
+            bata = pd.read_sql("SELECT * FROM user", con=con)
+        iid = bata["id"][0]
+        if iid == id:
+            hash1 = bata["pass"][0]
+        egg = f"{id}{pwd}!{barsC}vz{id}"
+        bytePwd = egg.encode("utf-8")
+        return bcrypt.checkpw(bytePwd, hash1)
+    except Exception as e:
+        print(e)
+        return None
 
 
 def max_margin_size(size, free_balance) -> float:
@@ -127,8 +138,9 @@ def max_margin_size(size, free_balance) -> float:
 
 
 class RiskManageTable:
-    def __init__(self, symbolist, col_index, free_balance):
+    def __init__(self, symbolist, col_index, balance):
         self.symbol = symbolist["symbol"][col_index]
+        self.quote = "BUSD" if self.symbol.endswith("BUSD") else "USDT"
         # if self.symbol[0:4] == "1000":
         #     self.symbol = self.symbol[4 : len(self.symbol)]
         self.timeframe = symbolist["timeframe"][col_index]
@@ -138,8 +150,9 @@ class RiskManageTable:
         self.use_tp_2 = self.check_bool(symbolist["UseTP2"][col_index])
         self.use_sl = self.check_bool(symbolist["UseSL"][col_index])
         self.use_tailing = self.check_bool(symbolist["Tail_SL"][col_index])
+        self.free_balance = float(balance["free"][self.quote])
         self.max_size = max_margin_size(
-            str(symbolist["maxMargin"][col_index]), free_balance
+            str(symbolist["maxMargin"][col_index]), self.free_balance
         )
         self.risk_size = str(symbolist["Risk"][col_index])
         self.tp_percent = symbolist["TP1"][col_index]
@@ -148,15 +161,30 @@ class RiskManageTable:
         self.risk_reward_2 = symbolist["RR2"][col_index]
         self.leverage = symbolist["leverage"][col_index]
 
-    def check_bool(self, arg):
+    def check_bool(self, arg) -> bool:
         return True if str(arg).lower() == "true" else False
+
+
+class Notified:
+    """List of notified SL."""
+
+    def __init__(self):
+        self.symbols = []
 
 
 @dataclass
 class Last_update:
     candle: str = "T -- ----------"
-    balance: str = "--"
+    balance: any = "--"
     status: str = "Starting"
+
+
+@dataclass
+class Timer:
+    min_timewait: int = 1
+    min_timeframe: str = "1m"
+    last_closed: any = 0.0
+    next_candle: any = 0.0
 
 
 @dataclass
@@ -236,23 +264,22 @@ def notify_send(msg, sticker=None, package=None, image_path=None):
     notify = LineNotify(config.notify_token)
     try:
         if image_path is not None:
-            return notify.send(message=msg, image_path=image_path)
+            notify.send(msg, image_path=image_path)
         elif sticker is not None:
-            return notify.send(
+            notify.send(
                 msg,
                 sticker_id=sticker,
                 package_id=package,
             )
         else:
-            return notify.send(msg)
+            notify.send(msg)
     except Exception as e:
-        logging.info(e)
-        return
+        print(e)
 
 
 def candle(df, symbol, tf):
     data = df.tail(60)
-    titles = f"{symbol}_{tf}".upper()
+    titles = f"{symbol}_{tf}"
     try:
         vxma = mplf.make_addplot(
             data.vxma, secondary_y=False, color="yellow", linewidths=0.2
@@ -277,7 +304,7 @@ def candle(df, symbol, tf):
             xrotation=20,
         )
     except Exception as e:
-        logging.info(e)
+        print(e)
         mplf.plot(
             data,
             type="candle",
@@ -290,7 +317,7 @@ def candle(df, symbol, tf):
             datetime_format="%y/%b/%d %H:%M",
             xrotation=20,
         )
-    return notify_send(f"info : {titles}", image_path=("./candle.png"))
+    return notify_send(f"{titles}", image_path=("/candle.png"))
 
 
 def clearconsol():
@@ -299,7 +326,32 @@ def clearconsol():
             os.system("clear")
         else:
             os.system("cls")
-        return
     except Exception as e:
-        logging.info(e)
-        return
+        print(e)
+
+
+def write_trade_record(
+    timestamp: datetime,
+    symbol: str,
+    amount: float,
+    price: float,
+    direction: str,
+    tp: any = None,
+    sl: float = None,
+    pnl: float = None,
+):
+    # Create a dataframe from the input data
+    df = pd.DataFrame(
+        {
+            "DateTime": [timestamp],
+            "Symbol": [symbol],
+            "Amount": [amount],
+            "Price": [price],
+            "Position": [direction],
+            "TP/SL": [f"{tp}/{sl}"],
+            "PNL$": [f"{round(pnl,2) if pnl is not None else None}"],
+        }
+    )
+
+    # Append the dataframe to the CSV file
+    df.to_csv("trades.csv", mode="a", index=False, header=False)
