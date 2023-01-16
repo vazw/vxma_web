@@ -101,6 +101,8 @@ TIMEFRAME_SECONDS = {
     "8h": 60 * 60 * 8,
     "12h": 60 * 60 * 12,
     "1d": 60 * 60 * 24,
+    "1w": 60 * 60 * 24 * 7,
+    "1M": 60 * 60 * 24 * 7,
 }
 
 
@@ -236,6 +238,20 @@ async def hourly_report():
     balance = await fetching_fiat_balance()
     lastUpdate.balance = balance
     lastUpdate.status = "Hourly report"
+    positions = balance["info"]["positions"]
+    status = pd.DataFrame(
+        [
+            position
+            for position in positions
+            if float(position["positionAmt"]) != 0
+        ],
+        columns=statcln,
+    )
+    netunpl = (
+        float((status["unrealizedProfit"]).astype("float64").sum())
+        if not status.empty
+        else 0.0
+    )
     msg = (
         "Balance Report\n BUSD"
         + f"\nFree   : {round(balance['BUSD']['free'],2)}$"
@@ -244,6 +260,7 @@ async def hourly_report():
         + f"\nFree   : {round(balance['USDT']['free'],2)}$"
         + f"\nMargin : {round(balance['USDT']['used'],2)}$"
         + f"\nTotal  : {round(balance['USDT']['total'],2)}$"
+        + f"\nNet Profit/Loss  : {round(netunpl,2)}$"
     )
     notify_send(msg)
     insession["hour"] = True
@@ -416,7 +433,7 @@ async def waiting():
         + f"{colorCS.CRED} Status : "
         + colorCS.CEND
         + f"{lastUpdate.status}",
-        end="\r",
+        end="\n",
     )
 
 
@@ -426,6 +443,8 @@ async def get_waiting_time():
         timer.min_timewait = min(
             TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
         )
+        if timer.min_timewait >= 3600:
+            timer.min_timewait = 1800
         timer.min_timeframe = next(
             i
             for i in symbolist["timeframe"]
@@ -458,7 +477,7 @@ async def warper_fn():
                 print("detected new settings")
                 await get_waiting_time()
 
-            if str(local_time[14:-9]) == "1":
+            if str(local_time[14:-9]) == "1" or str(local_time[14:-9]) == "3":
                 insession["day"] = False
                 insession["hour"] = False
             if str(local_time[11:-9]) == "07:0" and not insession["day"]:
@@ -466,6 +485,7 @@ async def warper_fn():
                 insession["hour"] = True
                 alrnotify.symbols = []
                 await asyncio.gather(dailyreport())
+                await hourly_report()
 
             if str(local_time[14:-9]) == "0" and not insession["hour"]:
                 await hourly_report()
@@ -476,11 +496,8 @@ async def warper_fn():
                 lastUpdate.candle = f"{datetime.now().isoformat()}"
                 await running_module()
                 timer.next_candle += timer.min_timewait
-                pass
             else:
-                print(round(timer.next_candle - t1))
                 await asyncio.sleep(round(timer.next_candle - t1))
-                pass
 
         except Exception as e:
             lastUpdate.status = f"{e}"
