@@ -1,6 +1,15 @@
 # VXMA Trading
 web app bot-trading version beta
 
+## Installtion
+for Docker
+```sh
+$ git clone https://github.com/vazw/vxma_web.git
+$ cd vxma_web
+$ docker build -t vxma_web .
+$ docker run -p 8050:8050 vxma_web
+```
+
 ### default 
 User = 'vxma'
 password = 'vxmaBot'
@@ -31,12 +40,24 @@ password = 'vxmaBot'
 ## Changelog
 > let's begin our journey to financial freedom!
 
-├─ 0.1.0 start! <br />
-├─ 0.1.1  <br />
+```
+├─ 0.1.0 start! 
+├─ 0.1.1  
 │   ├── Update terminal UI
 │   ├── Woring on Docker
 │   ├── Better error handler
 │   ├── Blazing fast 
+├─ 0.1.2  
+│   ├── Update Performance
+│   ├── Update CCXT symbols
+│   ├── Fixed bug
+│   ├── New callbackRate 
+├─ 0.1.3  
+│   ├── Update Performance
+│   ├── Update Candle faster
+│   ├── Fixed bug order
+│   ├── SL notification 
+```
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)
 
@@ -53,7 +74,6 @@ vxma_web/
 │   │   ├── Appdata.py
 │   │   ├── Bot.py
 │   │   ├── __init__.py
-│   │   ├── oldutil
 │   │   └── ResetDatabase.py
 │   ├── Backtesting
 │   │   ├── Candle_ohlc.py
@@ -65,9 +85,7 @@ vxma_web/
 │   │   ├── Benchmarking.py
 │   │   ├── ematalib.py
 │   │   ├── __init__.py
-│   │   ├── vxma_pandas_ta.py
 │   │   ├── vxma_talib.py
-│   │   └── vxmatalib.py
 │   ├── web
 │   │   ├── __init__.py
 │   │   └── web.py
