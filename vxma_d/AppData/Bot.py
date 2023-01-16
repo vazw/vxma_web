@@ -354,7 +354,7 @@ async def running_module():
                     sticker=17857,
                     package=1070,
                 )
-                return
+                pass
 
             await asyncio.gather(
                 feed(
@@ -369,8 +369,6 @@ async def running_module():
         except Exception as e:
             lastUpdate.status = f"{e}"
             pass
-
-    # await asyncio.sleep(30)
 
 
 async def waiting():
@@ -437,7 +435,10 @@ async def get_waiting_time():
         await running_module()
         timer.next_candle = timer.last_closed + timer.min_timewait
     except Exception:
-        pass
+        tasks = asyncio.current_task()
+        clearconsol()
+        tasks.cancel()
+        raise ConnectionError
 
 
 async def warper_fn():
@@ -454,6 +455,7 @@ async def warper_fn():
             if timer.min_timewait != min(
                 TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
             ):
+                print("detected new settings")
                 await get_waiting_time()
 
             if str(local_time[14:-9]) == "1":
@@ -474,8 +476,11 @@ async def warper_fn():
                 lastUpdate.candle = f"{datetime.now().isoformat()}"
                 await running_module()
                 timer.next_candle += timer.min_timewait
+                pass
             else:
-                await asyncio.sleep(timer.next_candle - t1)
+                print(round(timer.next_candle - t1))
+                await asyncio.sleep(round(timer.next_candle - t1))
+                pass
 
         except Exception as e:
             lastUpdate.status = f"{e}"

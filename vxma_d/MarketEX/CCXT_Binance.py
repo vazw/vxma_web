@@ -173,6 +173,7 @@ async def fetchbars(symbol, timeframe):
         )
         if timeframe == timer.min_timeframe:
             timer.last_closed = int(df["timestamp"][len(df.index) - 1] / 1000)
+
         df["timestamp"] = pd.to_datetime(
             df["timestamp"], unit="ms", utc=True
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
@@ -185,6 +186,9 @@ async def fetchbars(symbol, timeframe):
             bars[:-1],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
+        if timeframe == timer.min_timeframe:
+            timer.last_closed = int(df["timestamp"][len(df.index) - 1] / 1000)
+
         df["timestamp"] = pd.to_datetime(
             df["timestamp"], unit="ms", utc=True
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
