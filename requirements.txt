@@ -26,3 +26,4 @@ TA-Lib
 tabulate
 gunicorn
 moment
+charset-normalizer==2.1.1

@@ -33,12 +33,14 @@ from vxma_d.AppData.Bot import (
 )
 from vxma_d.MarketEX.CCXT_Binance import (
     connect,
+    connect_loads,
     fetchbars,
     fetching_balance,
     disconnect,
     get_symbol,
     getAllsymbol,
     OpenLong,
+    get_bidask,
 )
 from vxma_d.Strategy.vxma_talib import vxma
 
@@ -431,7 +433,23 @@ async def tester_order():
     await OpenLong(df, balance, risk_manage_data.__dict__, "LONG", min_balance)
 
 
+async def tester_balance():
+    symbol = "BTC/USDT:USDT"
+    exchange = await connect_loads()
+
+    # symbols = []
+    ask = await get_bidask(symbol, exchange, "ask")
+    # info = await exchange.fetch_bids_asks()
+    print(ask)
+    await disconnect(exchange)
+    # print(info)
+    # for x, y in info.items():
+    #     symbols.append(x)
+    # print(symbols)
+    # print(len(symbols))
+
+
 if __name__ == "__main__":
     # asyncio.run(tester_order())
-    asyncio.run(balance())
+    asyncio.run(tester_balance())
     # print(dt.now().timestamp())

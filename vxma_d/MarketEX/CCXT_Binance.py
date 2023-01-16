@@ -28,9 +28,9 @@ def callbackRate(data, direction):
     lowest = data["lowest"][m - 1]
     try:
         if direction:
-            rate = round((close - lowest) / close, 1)
+            rate = round((100 - (lowest / close * 100)), 1)
         else:
-            rate = round((highest - close) / highest, 1)
+            rate = round((100 - (close / highest * 100)), 1)
         if rate > 5.0:
             return 5.0
         elif rate < 1.0:
@@ -80,9 +80,12 @@ async def disconnect(exchange):
     return await exchange.close()
 
 
-async def get_bidask(symbol, exchange, bidask="askPrice"):
-    info = (await exchange.fetch_bids_asks([symbol]))[symbol]["info"]
-    return float(info[bidask])
+async def get_bidask(symbol, exchange, bidask="ask"):
+    try:
+        info = (await exchange.fetch_bids_asks())[symbol][bidask]
+    except Exception:
+        info = (await exchange.fetch_bids_asks())[symbol[:-5]][bidask]
+    return float(info)
 
 
 async def get_symbol():
@@ -492,122 +495,120 @@ def sellsize(df, balance, symbol, exchange, RISK):
 # OpenLong=Buy
 async def OpenLong(df, balance, risk_manage, Lside, min_balance):
     exchange = await connect_loads()
-    try:
-        await exchange.cancel_all_orders(risk_manage["symbol"])
-        amount = buysize(
-            df,
-            balance,
-            risk_manage["symbol"],
-            exchange,
-            risk_manage["risk_size"],
+    # try:
+    await exchange.cancel_all_orders(risk_manage["symbol"])
+    amount = buysize(
+        df,
+        balance,
+        risk_manage["symbol"],
+        exchange,
+        risk_manage["risk_size"],
+    )
+    markets = await exchange.fetchMarkets()
+    min_amount = float(
+        (
+            data["limits"]["amount"]["min"]
+            for data in markets
+            if data["symbol"] == risk_manage["symbol"]
+        ).__next__()
+    )
+    if amount < min_amount:
+        amount = min_amount
+    ask = await get_bidask(risk_manage["symbol"], exchange, "ask")
+    leve = await setleverage(
+        risk_manage["symbol"], risk_manage["leverage"], exchange
+    )
+    if amount * ask > risk_manage["max_size"] * int(leve):
+        new_lots = risk_manage["max_size"] * int(leve) / ask
+        amount = float(
+            exchange.amount_to_precision(risk_manage["symbol"], new_lots)
         )
-        markets = await exchange.fetchMarkets()
-        min_amount = float(
-            (
-                data["limits"]["amount"]["min"]
-                for data in markets
-                if data["id"] == risk_manage["symbol"][:-5].replace("/", "")
-            ).__next__()
-        )
-        if amount < min_amount:
-            amount = min_amount
-        ask = await get_bidask(risk_manage["symbol"], exchange, "askPrice")
-        leve = await setleverage(
-            risk_manage["symbol"], risk_manage["leverage"], exchange
-        )
-        if amount * ask > risk_manage["max_size"] * int(leve):
-            new_lots = risk_manage["max_size"] * int(leve) / ask
-            amount = float(
-                exchange.amount_to_precision(risk_manage["symbol"], new_lots)
+    free = float(risk_manage["free_balance"])
+    amttp1 = amount * (risk_manage["tp_percent"] / 100)
+    amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
+    low = df["lowest"][len(df.index) - 1]
+    quote = risk_manage["quote"]
+    if free > min_balance:
+        try:
+            order = await exchange.create_market_order(
+                risk_manage["symbol"],
+                "buy",
+                amount,
+                params={"positionSide": Lside},
             )
-        free = float(risk_manage["free_balance"])
-        amttp1 = amount * (risk_manage["tp_percent"] / 100)
-        amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
-        low = df["lowest"][len(df.index) - 1]
-        quote = risk_manage["quote"]
-        if free > min_balance:
-            try:
-                order = await exchange.create_market_order(
-                    risk_manage["symbol"],
-                    "buy",
-                    amount,
-                    params={"positionSide": Lside},
-                )
-                print(order)
-                margin = ask * amount / int(leve)
-                total = float(balance["total"][quote])
-            except ccxt.InsufficientFunds as e:
-                notify_send(e)
-                return await disconnect(exchange)
-            if risk_manage["use_tp_1"]:
-                tp12 = await USETPLONG(
-                    risk_manage["symbol"],
-                    df,
-                    exchange,
-                    ask,
-                    risk_manage["risk_reward_1"],
-                    risk_manage["risk_reward_2"],
-                    Lside,
-                    amttp1,
-                    amttp2,
-                    risk_manage["use_tp_2"],
-                )
-            if risk_manage["use_sl"]:
-                slprice = await USESLLONG(
-                    risk_manage["symbol"],
-                    exchange,
-                    amount,
-                    low,
-                    Lside,
-                )
-            msg = (
-                "BINANCE:"
-                + f"\nCoin        : {risk_manage['symbol']}"
-                + "\nStatus      : OpenLong[BUY]"
-                + f"\nAmount      : {amount}({round((amount * ask), 2)}{quote})"
-                + f"\nPrice       : {ask}{quote}"
-                + f"\nmargin      : {round(margin, 2)}{quote}"
-                + f"\nBalance     : {round(total, 2)}{quote}"
-                + f"\nTP Price    : {tp12}{quote}"
-                + f"\nSL Price    : {slprice}{quote}"
+            print(order)
+            margin = ask * amount / int(leve)
+            total = float(balance["total"][quote])
+        except ccxt.InsufficientFunds as e:
+            notify_send(e)
+            return await disconnect(exchange)
+        if risk_manage["use_tp_1"]:
+            tp12 = await USETPLONG(
+                risk_manage["symbol"],
+                df,
+                exchange,
+                ask,
+                risk_manage["risk_reward_1"],
+                risk_manage["risk_reward_2"],
+                Lside,
+                amttp1,
+                amttp2,
+                risk_manage["use_tp_2"],
             )
-            notify_send(msg)
-            if risk_manage["use_tailing"]:
-                await TailingLongOrder(
-                    df,
-                    risk_manage["symbol"],
-                    exchange,
-                    ask,
-                    amount,
-                    low,
-                    Lside,
-                )
-        else:
-            msg = (
-                f"MARGIN-CALL!!!\nยอดเงินต่ำกว่าที่กำหนดไว้ :{min_balance}USD"
-                + f"\nยอดปัจจุบัน  {round(free, 2)}"
-                + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
+        if risk_manage["use_sl"]:
+            slprice = await USESLLONG(
+                risk_manage["symbol"],
+                exchange,
+                amount,
+                low,
+                Lside,
             )
-            notify_send(msg)
-        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
-        write_trade_record(
-            time_now,
-            risk_manage["symbol"],
-            amount,
-            ask,
-            "OpenLong[BUY]",
-            tp12,
-            slprice,
+        msg = (
+            "BINANCE:"
+            + f"\nCoin        : {risk_manage['symbol']}"
+            + "\nStatus      : OpenLong[BUY]"
+            + f"\nAmount      : {amount}({round((amount * ask), 2)}{quote})"
+            + f"\nPrice       : {ask}{quote}"
+            + f"\nmargin      : {round(margin, 2)}{quote}"
+            + f"\nBalance     : {round(total, 2)}{quote}"
+            + f"\nTP Price    : {tp12}{quote}"
+            + f"\nSL Price    : {slprice}{quote}"
         )
-        candle(
-            df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}"
+        notify_send(msg)
+        if risk_manage["use_tailing"]:
+            await TailingLongOrder(
+                df,
+                risk_manage["symbol"],
+                exchange,
+                ask,
+                amount,
+                low,
+                Lside,
+            )
+    else:
+        msg = (
+            f"MARGIN-CALL!!!\nยอดเงินต่ำกว่าที่กำหนดไว้ :{min_balance}USD"
+            + f"\nยอดปัจจุบัน  {round(free, 2)}"
+            + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
         )
-        return await disconnect(exchange)
-    except Exception as e:
-        print(e)
-        lastUpdate.status = f"{e}"
-        notify_send(f"เกิดความผิดพลาดในการเข้า Order : OpenLong\n {e}")
-        return await disconnect(exchange)
+        notify_send(msg)
+    time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+    write_trade_record(
+        time_now,
+        risk_manage["symbol"],
+        amount,
+        ask,
+        "OpenLong[BUY]",
+        tp12,
+        slprice,
+    )
+    candle(df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}")
+    return await disconnect(exchange)
+    # except Exception as e:
+    #     print(e)
+    #     lastUpdate.status = f"{e}"
+    #     notify_send(f"เกิดความผิดพลาดในการเข้า Order : OpenLong\n {e}")
+    #     return await disconnect(exchange)
 
 
 async def USETPSHORT(
@@ -672,12 +673,12 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
             (
                 data["limits"]["amount"]["min"]
                 for data in markets
-                if data["id"] == risk_manage["symbol"][:-5].replace("/", "")
+                if data["symbol"] == risk_manage["symbol"]
             ).__next__()
         )
         if amount < min_amount:
             amount = min_amount
-        bid = await get_bidask(risk_manage["symbol"], exchange, "bidPrice")
+        bid = await get_bidask(risk_manage["symbol"], exchange, "bid")
         leve = await setleverage(
             risk_manage["symbol"], risk_manage["leverage"], exchange
         )
@@ -782,7 +783,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
         amount = abs(amt)
         upnl = pnl
         quote = symbol[-4:]
-        bid = await get_bidask(symbol, exchange, "bidPrice")
+        bid = await get_bidask(symbol, exchange, "bid")
         try:
             order = await exchange.create_market_order(
                 symbol, "sell", amount, params={"positionSide": Lside}
@@ -825,7 +826,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
         amount = abs(amt)
         quote = symbol[-4:]
         upnl = pnl
-        ask = await get_bidask(symbol, exchange, "askPrice")
+        ask = await get_bidask(symbol, exchange, "ask")
         try:
             order = await exchange.create_market_order(
                 symbol, "buy", amount, params={"positionSide": Sside}
