@@ -466,8 +466,7 @@ async def warper_fn():
                 await running_module()
                 timer.next_candle += timer.min_timewait
             else:
-                # await asyncio.sleep(timer.next_candle - t1)
-                await asyncio.sleep(1)
+                await asyncio.sleep(timer.next_candle - t1)
 
         except Exception as e:
             lastUpdate.status = f"{e}"
