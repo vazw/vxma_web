@@ -235,8 +235,7 @@ def remove_last_line_from_string(text):
 
 
 async def hourly_report():
-    balance = await fetching_fiat_balance()
-    lastUpdate.balance = balance
+    balance = await fetching_balance()
     lastUpdate.status = "Hourly report"
     positions = balance["info"]["positions"]
     status = pd.DataFrame(
@@ -247,19 +246,23 @@ async def hourly_report():
         ],
         columns=statcln,
     )
-    netunpl = (
-        float((status["unrealizedProfit"]).astype("float64").sum())
+    netunpl = float(
+        status["unrealizedProfit"].astype("float64").sum()
         if not status.empty
         else 0.0
     )
+    fiat_balance = {
+        x: y for x, y in balance.items() if x == "USDT" or x == "BUSD"
+    }
+    lastUpdate.balance = fiat_balance
     msg = (
         "Balance Report\n BUSD"
-        + f"\nFree   : {round(balance['BUSD']['free'],2)}$"
-        + f"\nMargin : {round(balance['BUSD']['used'],2)}$"
-        + f"\nTotal  : {round(balance['BUSD']['total'],2)}$\nUSDT"
-        + f"\nFree   : {round(balance['USDT']['free'],2)}$"
-        + f"\nMargin : {round(balance['USDT']['used'],2)}$"
-        + f"\nTotal  : {round(balance['USDT']['total'],2)}$"
+        + f"\nFree   : {round(fiat_balance['BUSD']['free'],2)}$"
+        + f"\nMargin : {round(fiat_balance['BUSD']['used'],2)}$"
+        + f"\nTotal  : {round(fiat_balance['BUSD']['total'],2)}$\nUSDT"
+        + f"\nFree   : {round(fiat_balance['USDT']['free'],2)}$"
+        + f"\nMargin : {round(fiat_balance['USDT']['used'],2)}$"
+        + f"\nTotal  : {round(fiat_balance['USDT']['total'],2)}$"
         + f"\nNet Profit/Loss  : {round(netunpl,2)}$"
     )
     notify_send(msg)
