@@ -484,11 +484,11 @@ async def warper_fn():
 
 
 async def run_bot():
-    print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
     config = AppConfig()
     if config.notify_token == "":
-        asyncio.sleep(60)
+        await asyncio.sleep(60)
         return
+    print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
     try:
         await get_currentmode()
         await get_waiting_time()
