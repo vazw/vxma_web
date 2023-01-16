@@ -30,7 +30,7 @@ from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 from vxma_d.Strategy.vxma_talib import vxma as ta
 
 
-bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.2) github.com/vazw/vxma_web"
+bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.3) github.com/vazw/vxma_web"
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -449,6 +449,12 @@ async def warper_fn():
     while True:
         try:
             local_time = time.ctime(time.time())
+
+            symbolist = bot_setting()
+            if timer.min_timewait != min(
+                TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
+            ):
+                await get_waiting_time()
 
             if str(local_time[14:-9]) == "1":
                 insession["day"] = False
