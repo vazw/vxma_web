@@ -306,11 +306,6 @@ async def running_module():
     lastUpdate.status = "Loading..."
     symbolist = bot_setting()
 
-    if symbolist is None or symbolist.empty:
-        lastUpdate.status = "Idle"
-        await asyncio.sleep(60)
-        return
-
     balance = await fetching_balance()
 
     for i in symbolist.index:
@@ -451,6 +446,11 @@ async def warper_fn():
             local_time = time.ctime(time.time())
 
             symbolist = bot_setting()
+            if symbolist is None or symbolist.empty:
+                lastUpdate.status = "Idle"
+                await asyncio.sleep(60)
+                return
+
             if timer.min_timewait != min(
                 TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
             ):
