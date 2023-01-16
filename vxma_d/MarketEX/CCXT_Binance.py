@@ -885,7 +885,7 @@ async def feed(
     min_balance,
     status,
 ):
-    posim = risk_manage["symbol"].replace("/", "")
+    posim = risk_manage["symbol"][:-5].replace("/", "")
     if status is None:
         return
     status = status[status["symbol"] == posim]
@@ -921,23 +921,27 @@ async def feed(
             and status["positionSide"][i] == "SHORT"
         ).__next__()
     else:
-        amt = (
-            status["positionAmt"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-        ).__next__()
-        amt_long = amt if amt > 0.0 else 0.0
-        amt_short = amt if amt < 0.0 else 0.0
-        upnl = (
-            status["unrealizedProfit"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-        ).__next__()
-        upnl_long = upnl if amt != 0.0 else 0.0
-        upnl_short = upnl if amt != 0.0 else 0.0
+        amt = float(
+            (
+                status["positionAmt"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+            ).__next__()
+        )
+        amt_long = amt if amt > 0 else 0.0
+        amt_short = amt if amt < 0 else 0.0
+        upnl = float(
+            (
+                status["unrealizedProfit"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+            ).__next__()
+        )
+        upnl_long = upnl if amt != 0 else 0.0
+        upnl_short = upnl if amt != 0 else 0.0
 
-    is_in_Long = True if amt_long != 0.0 else False
-    is_in_Short = True if amt_short != 0.0 else False
+    is_in_Long = True if amt_long != 0 else False
+    is_in_Short = True if amt_short != 0 else False
 
     last = len(df.index) - 1
     if (

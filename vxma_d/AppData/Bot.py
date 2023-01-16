@@ -429,17 +429,20 @@ async def waiting():
 
 async def get_waiting_time():
     symbolist = bot_setting()
-    timer.min_timewait = min(
-        TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
-    )
-    timer.min_timeframe = next(
-        i
-        for i in symbolist["timeframe"]
-        if TIMEFRAME_SECONDS[i] == timer.min_timewait
-    )
-    lastUpdate.candle = f"{datetime.now().isoformat()}"
-    await running_module()
-    timer.next_candle = timer.last_closed + timer.min_timewait
+    try:
+        timer.min_timewait = min(
+            TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
+        )
+        timer.min_timeframe = next(
+            i
+            for i in symbolist["timeframe"]
+            if TIMEFRAME_SECONDS[i] == timer.min_timewait
+        )
+        lastUpdate.candle = f"{datetime.now().isoformat()}"
+        await running_module()
+        timer.next_candle = timer.last_closed + timer.min_timewait
+    except Exception:
+        pass
 
 
 async def warper_fn():
