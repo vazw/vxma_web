@@ -21,7 +21,6 @@ from vxma_d.MarketEX.CCXT_Binance import (
     feed,
     fetchbars,
     fetching_balance,
-    fetching_fiat_balance,
     getAllsymbol,
     get_currentmode,
     get_symbol,
@@ -207,7 +206,6 @@ async def get_dailytasks():
                 bot_3(symbol, ta_data.__dict__, "1h"),
             )
 
-            # candle(df2, symbol, "6h")
             # candle(df3, symbol, "1h")
             if df1 is not None:
                 time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
@@ -218,7 +216,7 @@ async def get_dailytasks():
                 yield pd.Series(
                     [
                         symbol,
-                        df3["close"][len(df1.index) - 1],
+                        df3["close"][len(df3.index) - 1],
                         long_term.benchmarking(),
                         mid_term.benchmarking(),
                         short_term.benchmarking(),
@@ -483,6 +481,7 @@ async def warper_fn():
             if str(local_time[14:-9]) == "1" or str(local_time[14:-9]) == "3":
                 insession["day"] = False
                 insession["hour"] = False
+
             if str(local_time[11:-9]) == "07:0" and not insession["day"]:
                 insession["day"] = True
                 insession["hour"] = True

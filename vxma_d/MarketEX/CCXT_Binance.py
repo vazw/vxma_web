@@ -101,13 +101,7 @@ async def get_symbol():
         print(e)
         market = await exchange.fetch_tickers(params={"type": "future"})
     await disconnect(exchange)
-    symbols = pd.DataFrame(
-        [
-            y
-            for x, y in market.items()
-            if x.endswith("USDT") or x.endswith("BUSD")
-        ]
-    )
+    symbols = pd.DataFrame([y for x, y in market.items() if "USD" in x[-4:]])
     symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
     symbols = symbols.head(10)
     newsym = [symbol for symbol in symbols["symbol"]]
@@ -130,13 +124,7 @@ async def getAllsymbol():
         print(e)
         market = await exchange.fetch_tickers(params={"type": "future"})
     await disconnect(exchange)
-    symbols = pd.DataFrame(
-        [
-            y
-            for x, y in market.items()
-            if x.endswith("USDT") or x.endswith("BUSD")
-        ]
-    )
+    symbols = pd.DataFrame([y for x, y in market.items() if "USD" in x[-4:]])
     symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
     return [symbol for symbol in symbols["symbol"]]
 
@@ -458,7 +446,7 @@ async def fetching_balance():
 
 async def fetching_fiat_balance():
     balance = await fetching_balance()
-    return {x: y for x, y in balance.items() if x == "USDT" or x == "BUSD"}
+    return {x: y for x, y in balance.items() if "USD" in x[-4:]}
 
 
 # Position Sizing
@@ -950,11 +938,11 @@ async def feed(
     last = len(df.index) - 1
     if (
         df["isSL"][last] == 1
-        and f"{risk_manage['symbol']}{df.index.last()}"
+        and f"{risk_manage['symbol']}{lastUpdate.candle}"
         not in alrnotify.symbols
     ):
         notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
-        alrnotify.symbols.append(f"{risk_manage['symbol']}{df.index.last()}")
+        alrnotify.symbols.append(f"{risk_manage['symbol']}{lastUpdate.candle}")
 
     if df["BUY"][last] == 1:
         lastUpdate.status = "changed to Bullish, buy"
