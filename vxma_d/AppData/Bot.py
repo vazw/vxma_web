@@ -7,7 +7,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from vxma_d.AppData import alrnotify, colorCS, lastUpdate, timer
+from vxma_d.AppData import alrnotify, colorCS, lastUpdate, timer, candle_ohlc
 from vxma_d.AppData.Appdata import (
     AppConfig,
     RiskManageTable,
@@ -269,6 +269,7 @@ async def hourly_report():
 
 async def dailyreport():
     lastUpdate.status = "Daily Report"
+    candle_ohlc.clear()
     try:
         notify_send(
             "คู่เทรดที่น่าสนใจในวันนี้\n",
@@ -313,6 +314,7 @@ async def dailyreport():
             sticker=1995,
             package=446,
         )
+        candle_ohlc.clear()
         return
     except Exception as e:
         notify_send(f"เกิดความผิดพลาดในส่วนของแจ้งเตือนรายวัน {e}")
