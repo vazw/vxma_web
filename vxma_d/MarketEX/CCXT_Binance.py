@@ -946,11 +946,10 @@ async def feed(
     last = len(df.index) - 1
     if (
         df["isSL"][last] == 1
-        and f"{risk_manage['symbol']}{lastUpdate.candle}"
-        not in alrnotify.symbols
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.symbols
     ):
         notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
-        alrnotify.symbols.append(f"{risk_manage['symbol']}{lastUpdate.candle}")
+        alrnotify.symbols.append(f"{risk_manage['symbol']}{df.index[last]}")
 
     if df["BUY"][last] == 1:
         lastUpdate.status = "changed to Bullish, buy"
