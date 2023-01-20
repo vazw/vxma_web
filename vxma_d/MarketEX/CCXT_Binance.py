@@ -450,7 +450,7 @@ async def fetching_fiat_balance():
 
 
 # Position Sizing
-def buysize(df, balance, symbol, exchange, RISK):
+def buysize(df, balance, symbol, exchange, RISK, min_amount):
     last = len(df.index) - 1
     quote = symbol[-4:]
     freeusd = float(balance["free"][quote])
@@ -463,11 +463,16 @@ def buysize(df, balance, symbol, exchange, RISK):
     else:
         risk = float(RISK)
     amount = abs(risk / (df["close"][last] - low))
+    if amount < min_amount:
+        amount = min_amount
+        notify_send(
+            f"ใช้ Size ขั้นต่ำสำหรับ {symbol}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"
+        )
     lot = exchange.amount_to_precision(symbol, amount)
     return float(lot)
 
 
-def sellsize(df, balance, symbol, exchange, RISK):
+def sellsize(df, balance, symbol, exchange, RISK, min_amount):
     last = len(df.index) - 1
     quote = symbol[-4:]
     freeusd = float(balance["free"][quote])
@@ -480,6 +485,11 @@ def sellsize(df, balance, symbol, exchange, RISK):
     else:
         risk = float(RISK)
     amount = abs(risk / (high - df["close"][last]))
+    if amount < min_amount:
+        amount = min_amount
+        notify_send(
+            f"ใช้ Size ขั้นต่ำสำหรับ {symbol}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"
+        )
     lot = exchange.amount_to_precision(symbol, amount)
     return float(lot)
 
@@ -489,13 +499,6 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
     exchange = await connect_loads()
     try:
         await exchange.cancel_all_orders(risk_manage["symbol"])
-        amount = buysize(
-            df,
-            balance,
-            risk_manage["symbol"],
-            exchange,
-            risk_manage["risk_size"],
-        )
         markets = await exchange.fetchMarkets()
         min_amount = float(
             (
@@ -504,17 +507,32 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
                 if data["symbol"] == risk_manage["symbol"]
             ).__next__()
         )
+        amount = buysize(
+            df,
+            balance,
+            risk_manage["symbol"],
+            exchange,
+            risk_manage["risk_size"],
+            min_amount,
+        )
         ask = await get_bidask(risk_manage["symbol"], exchange, "ask")
         leve = await setleverage(
             risk_manage["symbol"], risk_manage["leverage"], exchange
         )
         if amount * ask > risk_manage["max_size"] * int(leve):
             new_lots = risk_manage["max_size"] * int(leve) / ask
+            if new_lots < min_amount:
+                new_lots = min_amount
+                notify_send(
+                    f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
+                )
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
         if amount < min_amount:
-            amount = min_amount
+            amount = float(
+                exchange.amount_to_precision(risk_manage["symbol"], min_amount)
+            )
             notify_send(
                 f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
             )
@@ -658,13 +676,6 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
     exchange = await connect_loads()
     try:
         await exchange.cancel_all_orders(risk_manage["symbol"])
-        amount = sellsize(
-            df,
-            balance,
-            risk_manage["symbol"],
-            exchange,
-            risk_manage["risk_size"],
-        )
         markets = await exchange.fetchMarkets()
         min_amount = float(
             (
@@ -673,17 +684,32 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
                 if data["symbol"] == risk_manage["symbol"]
             ).__next__()
         )
+        amount = sellsize(
+            df,
+            balance,
+            risk_manage["symbol"],
+            exchange,
+            risk_manage["risk_size"],
+            min_amount,
+        )
         bid = await get_bidask(risk_manage["symbol"], exchange, "bid")
         leve = await setleverage(
             risk_manage["symbol"], risk_manage["leverage"], exchange
         )
         if amount * bid > risk_manage["max_size"] * int(leve):
             new_lots = risk_manage["max_size"] * int(leve) / bid
+            if new_lots < min_amount:
+                new_lots = min_amount
+                notify_send(
+                    f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
+                )
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
         if amount < min_amount:
-            amount = min_amount
+            amount = float(
+                exchange.amount_to_precision(risk_manage["symbol"], min_amount)
+            )
             notify_send(
                 f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
             )
