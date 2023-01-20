@@ -529,13 +529,6 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
-        if amount < min_amount:
-            amount = float(
-                exchange.amount_to_precision(risk_manage["symbol"], min_amount)
-            )
-            notify_send(
-                f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
-            )
         free = float(risk_manage["free_balance"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
         amttp2 = amount * (risk_manage["tp_percent_2"] / 100)
@@ -705,13 +698,6 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
                 )
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
-            )
-        if amount < min_amount:
-            amount = float(
-                exchange.amount_to_precision(risk_manage["symbol"], min_amount)
-            )
-            notify_send(
-                f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
             )
         free = float(risk_manage["free_balance"])
         amttp1 = amount * (risk_manage["tp_percent"] / 100)
