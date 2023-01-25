@@ -240,6 +240,7 @@ def remove_last_line_from_string(text):
 
 
 async def hourly_report():
+    await account_balance.update_balance()
     balance = account_balance.balance
     lastUpdate.status = "Hourly report"
     positions = balance["info"]["positions"]
@@ -329,10 +330,10 @@ async def dailyreport():
 async def running_module():
     lastUpdate.status = "Loading..."
     symbolist = bot_setting()
+    await account_balance.update_balance()
 
     for i in symbolist.index:
         try:
-
             ta_table_data = TATable(
                 atr_p=symbolist["ATR"][i],
                 atr_m=symbolist["ATR_m"][i],
@@ -559,6 +560,7 @@ async def run_bot():
         return
     print(f"{colorCS.CBOLD}{colorCS.CGREEN}{bot_name}{colorCS.CEND}")
     try:
+        await account_balance.update_balance()
         await get_currentmode()
         await get_waiting_time()
         await waiting()

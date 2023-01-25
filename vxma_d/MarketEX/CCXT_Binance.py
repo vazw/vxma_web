@@ -1050,7 +1050,7 @@ async def feed(
                 currentMode.Sside,
                 risk_manage["timeframe"],
             )
-            account_balance.update_balance()
+            await account_balance.update_balance()
             if risk_manage["use_long"]:
                 await OpenLong(
                     df,
@@ -1059,7 +1059,7 @@ async def feed(
                     currentMode.Lside,
                     min_balance,
                 )
-                account_balance.update_balance()
+                await account_balance.update_balance()
                 alrnotify.orders.append(
                     f"{risk_manage['symbol']}{df.index[last]}"
                 )
@@ -1075,7 +1075,7 @@ async def feed(
                     currentMode.Lside,
                     min_balance,
                 )
-                account_balance.update_balance()
+                await account_balance.update_balance()
                 alrnotify.orders.append(
                     f"{risk_manage['symbol']}{df.index[last]}"
                 )
@@ -1098,7 +1098,7 @@ async def feed(
                 currentMode.Lside,
                 risk_manage["timeframe"],
             )
-            account_balance.update_balance()
+            await account_balance.update_balance()
             if risk_manage["use_short"]:
                 await OpenShort(
                     df,
@@ -1107,7 +1107,7 @@ async def feed(
                     currentMode.Sside,
                     min_balance,
                 )
-                account_balance.update_balance()
+                await account_balance.update_balance()
                 alrnotify.orders.append(
                     f"{risk_manage['symbol']}{df.index[last]}"
                 )
@@ -1122,7 +1122,7 @@ async def feed(
                     currentMode.Sside,
                     min_balance,
                 )
-                account_balance.update_balance()
+                await account_balance.update_balance()
                 alrnotify.orders.append(
                     f"{risk_manage['symbol']}{df.index[last]}"
                 )
@@ -1237,7 +1237,7 @@ async def feed_hedge(
                 min_balance,
                 False,
             )
-            account_balance.update_balance()
+            await account_balance.update_balance()
             alrnotify.orders.append(f"{risk_manage['symbol']}{df.index[last]}")
         else:
             print("No permission for excute order : Do nothing")
@@ -1260,7 +1260,7 @@ async def feed_hedge(
             currentMode.Sside,
             risk_manage["hedge_timeframe"],
         )
-        account_balance.update_balance()
+        await account_balance.update_balance()
 
     # Open Short if the higher trend are bullish
     # but got Sell signal form lower timeframe
@@ -1280,7 +1280,7 @@ async def feed_hedge(
                 min_balance,
                 False,
             )
-            account_balance.update_balance()
+            await account_balance.update_balance()
             alrnotify.orders.append(f"{risk_manage['symbol']}{df.index[last]}")
         else:
             print("No permission for excute order : Do nothing")
@@ -1303,4 +1303,4 @@ async def feed_hedge(
             currentMode.Lside,
             risk_manage["hedge_timeframe"],
         )
-        account_balance.update_balance()
+        await account_balance.update_balance()
