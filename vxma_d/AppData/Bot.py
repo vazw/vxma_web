@@ -348,11 +348,26 @@ async def running_module():
             risk_manage_data = RiskManageTable(symbolist, i, balance)
             lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
 
-            data = await bot_1(
-                risk_manage_data.symbol,
-                ta_table_data.__dict__,
-                risk_manage_data.timeframe,
-            )
+            if risk_manage_data.usehedge:
+                data, df_hedge = await asyncio.gather(
+                    bot_1(
+                        risk_manage_data.symbol,
+                        ta_table_data.__dict__,
+                        risk_manage_data.timeframe,
+                    ),
+                    bot_2(
+                        risk_manage_data.symbol,
+                        ta_table_data.__dict__,
+                        risk_manage_data.hedge_timeframe,
+                    ),
+                )
+            else:
+                data = await bot_1(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.timeframe,
+                )
+                df_hedge = None
 
             positions = balance["info"]["positions"]
             status = pd.DataFrame(
@@ -379,25 +394,28 @@ async def running_module():
                 )
                 pass
 
-            await asyncio.gather(
-                feed(
-                    data,
-                    risk_manage_data.__dict__,
-                    balance,
-                    min_balance,
-                    status,
-                )
-            )
-
-            if risk_manage_data.usehedge:
-                df_hedge = await bot_2(
-                    risk_manage_data.symbol,
-                    ta_table_data.__dict__,
-                    risk_manage_data.hedge_timeframe,
-                )
+            if df_hedge is not None:
                 await asyncio.gather(
+                    feed(
+                        data,
+                        risk_manage_data.__dict__,
+                        balance,
+                        min_balance,
+                        status,
+                    ),
                     feed_hedge(
                         df_hedge,
+                        data,
+                        risk_manage_data.__dict__,
+                        balance,
+                        min_balance,
+                        status,
+                    ),
+                )
+            else:
+                await asyncio.gather(
+                    feed(
+                        data,
                         risk_manage_data.__dict__,
                         balance,
                         min_balance,
