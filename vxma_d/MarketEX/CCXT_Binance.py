@@ -264,7 +264,6 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": side,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         else:
@@ -277,7 +276,6 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": side,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         print(ordertailingSL)
@@ -311,7 +309,6 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         else:
@@ -325,7 +322,6 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
                     "callbackRate": callbackrate,
                     "reduceOnly": True,
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         print(ordertailingSL)

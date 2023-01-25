@@ -483,9 +483,13 @@ async def waiting():
 async def get_waiting_time():
     symbolist = bot_setting()
     try:
-        timer.min_timewait = min(
+        min_timewait_tf = min(
             TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
         )
+        min_timewait_hedge = min(
+            TIMEFRAME_SECONDS[x] for x in symbolist["hedge_timeframe"]
+        )
+        timer.min_timewait = min(min_timewait_hedge, min_timewait_tf)
         if timer.min_timewait >= 3600:
             timer.min_timewait = 1800
         timer.min_timeframe = next(
@@ -514,9 +518,14 @@ async def warper_fn():
                 await asyncio.sleep(60)
                 return
 
-            if timer.min_timewait != min(
+            min_timewait_tf = min(
                 TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
-            ):
+            )
+            min_timewait_hedge = min(
+                TIMEFRAME_SECONDS[x] for x in symbolist["hedge_timeframe"]
+            )
+
+            if timer.min_timewait != min(min_timewait_hedge, min_timewait_tf):
                 print("detected new settings")
                 await get_waiting_time()
 
