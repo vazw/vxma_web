@@ -1023,7 +1023,7 @@ async def feed(
             (amt_long + amt_short),
             df["close"][last],
             "Stop-Loss",
-            pnl=float(risk_manage["risk_size"][1:]),
+            pnl=-float(risk_manage["risk_size"][1:]),
         )
         candle(
             df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}"
@@ -1206,7 +1206,7 @@ async def feed_hedge(
             (amt_long + amt_short),
             df["close"][last],
             "Stop-Loss",
-            pnl=float(risk_manage["risk_size"][1:]),
+            pnl=-float(risk_manage["risk_size"][1:]),
         )
         candle(
             df,

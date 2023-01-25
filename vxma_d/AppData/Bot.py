@@ -483,28 +483,24 @@ async def waiting():
 async def get_waiting_time():
     symbolist = bot_setting()
     try:
-        min_timewait_tf = min(
-            TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
-        )
-        min_timewait_hedge = min(
-            TIMEFRAME_SECONDS[x] for x in symbolist["hedgeTF"]
-        )
-        timer.min_timewait = min(min_timewait_hedge, min_timewait_tf)
+        all_timeframes = [x for x in symbolist["timeframe"]] + [
+            y for y in symbolist["hedgeTF"]
+        ]
+        tf_secconds = [TIMEFRAME_SECONDS[x] for x in all_timeframes]
+        timer.min_timewait = min(tf_secconds)
         if timer.min_timewait >= 3600:
             timer.min_timewait = 1800
         timer.min_timeframe = next(
             i
-            for i in symbolist["timeframe"]
+            for i in all_timeframes
             if TIMEFRAME_SECONDS[i] == timer.min_timewait
         )
         lastUpdate.candle = f"{datetime.now().isoformat()}"
         await running_module()
         timer.next_candle = timer.last_closed + timer.min_timewait
-    except Exception:
-        tasks = asyncio.current_task()
-        clearconsol()
-        tasks.cancel()
-        raise ConnectionError
+    except Exception as e:
+        print(f"fail to set min time :{e}")
+        return await get_waiting_time()
 
 
 async def warper_fn():
@@ -518,14 +514,12 @@ async def warper_fn():
                 await asyncio.sleep(60)
                 return
 
-            min_timewait_tf = min(
-                TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
-            )
-            min_timewait_hedge = min(
-                TIMEFRAME_SECONDS[x] for x in symbolist["hedgeTF"]
-            )
+            all_timeframes = [x for x in symbolist["timeframe"]] + [
+                y for y in symbolist["hedgeTF"]
+            ]
+            tf_secconds = [TIMEFRAME_SECONDS[x] for x in all_timeframes]
 
-            if timer.min_timewait != min(min_timewait_hedge, min_timewait_tf):
+            if timer.min_timewait != min(tf_secconds):
                 print("detected new settings")
                 await get_waiting_time()
 
