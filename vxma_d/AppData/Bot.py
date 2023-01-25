@@ -487,7 +487,7 @@ async def get_waiting_time():
             TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
         )
         min_timewait_hedge = min(
-            TIMEFRAME_SECONDS[x] for x in symbolist["hedge_timeframe"]
+            TIMEFRAME_SECONDS[x] for x in symbolist["hedgeTF"]
         )
         timer.min_timewait = min(min_timewait_hedge, min_timewait_tf)
         if timer.min_timewait >= 3600:
@@ -522,7 +522,7 @@ async def warper_fn():
                 TIMEFRAME_SECONDS[x] for x in symbolist["timeframe"]
             )
             min_timewait_hedge = min(
-                TIMEFRAME_SECONDS[x] for x in symbolist["hedge_timeframe"]
+                TIMEFRAME_SECONDS[x] for x in symbolist["hedgeTF"]
             )
 
             if timer.min_timewait != min(min_timewait_hedge, min_timewait_tf):
