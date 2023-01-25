@@ -276,6 +276,8 @@ async def hourly_report():
 async def dailyreport():
     lastUpdate.status = "Daily Report"
     candle_ohlc.clear()
+    alrnotify.orders.clear()
+    alrnotify.symbols.clear()
     try:
         notify_send(
             "คู่เทรดที่น่าสนใจในวันนี้\n",
@@ -525,7 +527,6 @@ async def warper_fn():
             if str(local_time[11:-9]) == "07:0" and not insession["day"]:
                 insession["day"] = True
                 insession["hour"] = True
-                alrnotify.symbols = []
                 await asyncio.gather(dailyreport())
                 await hourly_report()
 
