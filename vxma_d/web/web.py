@@ -151,6 +151,9 @@ option_input = dmc.Group(
         dmc.Checkbox(
             label="Tailing-Stop", size="xs", checked=True, id="Tailing-input"
         ),
+        dmc.Checkbox(
+            label="Hedging", size="xs", checked=True, id="hedging-input"
+        ),
     ],
 )
 
@@ -174,6 +177,17 @@ timeframe_dropdown = dmc.Select(
     id="timeframe-dropdown",
     searchable=True,
     value="6h",
+    clearable=False,
+    style={"width": 75},
+)
+timeframe_hedge = dmc.Select(
+    data=[
+        {"label": timeframe, "value": timeframe} for timeframe in TIMEFRAMES
+    ],
+    label="Hedging-Timeframe",
+    id="hedging-timeframe",
+    searchable=True,
+    value="30m",
     clearable=False,
     style={"width": 75},
 )
@@ -689,6 +703,7 @@ vxma_page = dmc.Container(
                                     [
                                         symbol_dropdown,
                                         timeframe_dropdown,
+                                        timeframe_hedge,
                                         num_bars_input,
                                     ],
                                     align="flex-start",
@@ -1490,6 +1505,8 @@ app.clientside_callback(
     State("TP2-input", "checked"),
     State("Stop-input", "checked"),
     State("Tailing-input", "checked"),
+    State("hedging-input", "checked"),
+    State("hedging-timeframe", "value"),
 )
 def excuteBot(
     click,
@@ -1517,6 +1534,8 @@ def excuteBot(
     tp2,
     sl,
     tsl,
+    usehedge,
+    hedge_timeframe,
 ):
     if click is not None:
         data = pd.DataFrame(columns=BOTCOL)
@@ -1547,6 +1566,8 @@ def excuteBot(
                 TP2,
                 Risk,
                 maxMargin,
+                usehedge,
+                hedge_timeframe,
             ]
             try:
                 data = pd.read_csv("bot_config.csv")

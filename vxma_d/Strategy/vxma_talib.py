@@ -275,6 +275,7 @@ class vxma:
                 BUY[i] = 0
                 SELL[i] = 0
 
+        self.data["trend"] = trend
         self.data["BUY"] = BUY
         self.data["buyPrice"] = buyPrice
         self.data["SELL"] = SELL

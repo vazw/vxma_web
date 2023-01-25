@@ -7,7 +7,13 @@ from datetime import datetime
 
 import pandas as pd
 
-from vxma_d.AppData import alrnotify, colorCS, lastUpdate, timer, candle_ohlc
+from vxma_d.AppData import (
+    alrnotify,
+    colorCS,
+    lastUpdate,
+    timer,
+    candle_ohlc,
+)
 from vxma_d.AppData.Appdata import (
     AppConfig,
     RiskManageTable,
@@ -19,11 +25,12 @@ from vxma_d.AppData.Appdata import (
 )
 from vxma_d.MarketEX.CCXT_Binance import (
     feed,
-    fetchbars,
-    fetching_balance,
+    feed_hedge,
     getAllsymbol,
     get_currentmode,
     get_symbol,
+    account_balance,
+    fetchbars,
 )
 from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 from vxma_d.Strategy.vxma_talib import vxma as ta
@@ -233,7 +240,7 @@ def remove_last_line_from_string(text):
 
 
 async def hourly_report():
-    balance = await fetching_balance()
+    balance = account_balance.balance
     lastUpdate.status = "Hourly report"
     positions = balance["info"]["positions"]
     status = pd.DataFrame(
@@ -249,9 +256,7 @@ async def hourly_report():
         if not status.empty
         else 0.0
     )
-    fiat_balance = {
-        x: y for x, y in balance.items() if x == "USDT" or x == "BUSD"
-    }
+    fiat_balance = account_balance.fiat_balance
     lastUpdate.balance = fiat_balance
     msg = (
         "Balance Report\n BUSD"
@@ -279,7 +284,7 @@ async def dailyreport():
         async for line in get_dailytasks():
             msg1 = remove_last_line_from_string(str(line))
             notify_send(msg=msg1)
-        balance = await fetching_balance()
+        balance = account_balance.balance
         positions = balance["info"]["positions"]
         status = pd.DataFrame(
             [
@@ -299,11 +304,10 @@ async def dailyreport():
         upnl = round(
             float((status["unrealizedProfit"]).astype("float64").sum()), 2
         )
+        symbol = status["symbol"][firstline]
         entryP = status["entryPrice"][firstline]
         metthod = status["positionSide"][firstline]
-        msg2 = (
-            f"{firstline} {metthod} at {entryP} \nunrealizedProfit : {upnl}$"
-        )
+        msg2 = f"{symbol} > {metthod} at {entryP} \nunrealizedProfit : {upnl}$"
         message = (
             f"Top Performance\n{msg2}\n-----\n"
             + f"Net Margin Used : {round(float(margin),2)}$"
@@ -326,8 +330,6 @@ async def running_module():
     lastUpdate.status = "Loading..."
     symbolist = bot_setting()
 
-    balance = await fetching_balance()
-
     for i in symbolist.index:
         try:
 
@@ -342,6 +344,7 @@ async def running_module():
                 pivot=symbolist["Pivot"][i],
             )
 
+            balance = account_balance.balance
             risk_manage_data = RiskManageTable(symbolist, i, balance)
             lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
 
@@ -386,6 +389,22 @@ async def running_module():
                 )
             )
 
+            if risk_manage_data.usehedge:
+                df_hedge = await bot_2(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.hedge_timeframe,
+                )
+                await asyncio.gather(
+                    feed_hedge(
+                        df_hedge,
+                        risk_manage_data.__dict__,
+                        balance,
+                        min_balance,
+                        status,
+                    )
+                )
+
         except Exception as e:
             lastUpdate.status = f"{e}"
             pass
@@ -394,7 +413,7 @@ async def running_module():
 async def waiting():
     text_time = f"{colorCS.CYELLOW} เวลา {colorCS.CGREEN}"
     time_now = f"{(lastUpdate.candle)[:-10].replace('T',text_time)}"
-    balance = await fetching_balance()
+    balance = account_balance.balance
     positions = balance["info"]["positions"]
     status = pd.DataFrame(
         [
@@ -506,7 +525,7 @@ async def warper_fn():
         except Exception as e:
             lastUpdate.status = f"{e}"
             print(e)
-            notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nบอทเข้าสู่ Sleep Mode")
+            notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nRestarting Bot...")
             lastUpdate.status = "Sleep Mode"
             await asyncio.sleep(60)
             tasks = asyncio.current_task()
@@ -527,6 +546,6 @@ async def run_bot():
         await waiting()
         await asyncio.gather(warper_fn())
     except Exception as e:
-        notify_send(f"บอทเข้าสู่สถานะ Fallback Mode\n{e}")
+        print(f"Restarting :{e}")
         lastUpdate.status = "Fallback Mode : Restarting..."
         return

@@ -14,8 +14,8 @@ from vxma_d.AppData import Bot, colorCS
 my_message = (
     f"\r{colorCS.CGREEN}\nก่อนที่เราจะเทรด"
     + f"{colorCS.CRED} Futures\n"
-    + f"{colorCS.CGREEN}เราต้องเข้าใจไว้ก่อนว่าเงินนั้นมันอาจจะหมดเป็นศูนย์ได้เลย\n"  # noqa:
-    + f"หากเราเข้าใจตามนี้แล้วความเสี่ยงทั้งหมดของเงินลงทุนจะเท่ากับ {colorCS.CBOLD}"  # noqa:
+    + f"{colorCS.CGREEN}เราต้องเข้าใจไว้ก่อนว่าเงินนั้นมันอาจจะหมดเป็นศูนย์ได้เลย\n"
+    + f"หากเราเข้าใจตามนี้แล้วความเสี่ยงทั้งหมดของเงินลงทุนจะเท่ากับ {colorCS.CBOLD}"
     + f"{colorCS.CRED}Risk 1 : Reward infinity เสมอ{colorCS.CEND}"
     + "\nขอให้โชคดี!"
 )

@@ -74,6 +74,8 @@ BOTCOL = [
     "TP2",
     "Risk",
     "maxMargin",
+    "hedge",
+    "hedgeTF",
 ]
 
 
@@ -160,6 +162,8 @@ class RiskManageTable:
         self.risk_reward_1 = symbolist["RR1"][col_index]
         self.risk_reward_2 = symbolist["RR2"][col_index]
         self.leverage = symbolist["leverage"][col_index]
+        self.usehedge = self.check_bool(symbolist["hedge"][col_index])
+        self.hedge_timeframe = symbolist["hedgeTF"][col_index]
 
     def check_bool(self, arg) -> bool:
         return True if str(arg).lower() == "true" else False
@@ -170,6 +174,7 @@ class Notified:
 
     def __init__(self):
         self.symbols = []
+        self.orders = []
 
 
 @dataclass

@@ -21,6 +21,37 @@ from vxma_d.AppData.Appdata import (
 barsC = 1502
 
 
+class AccountBalance:
+    """docstring for AccountBalance."""
+
+    def __init__(self):
+        self.balance = ""
+        self.fiat_balance = ""
+
+    async def update_balance(self):
+        exchange = await connect()
+        try:
+            balance = await exchange.fetch_balance()
+            await disconnect(exchange)
+            self.balance = balance
+            self.fiat_balance = {
+                x: y for x, y in balance.items() if "USD" in x[-4:]
+            }
+        except Exception as e:
+            lastUpdate.status = f"{e}"
+            await disconnect(exchange)
+            exchange = await connect()
+            balance = await exchange.fetch_balance()
+            await disconnect(exchange)
+            self.balance = balance
+            self.fiat_balance = {
+                x: y for x, y in balance.items() if "USD" in x[-4:]
+            }
+
+
+account_balance = AccountBalance()
+
+
 def callbackRate(data, direction):
     m = len(data.index)
     close = data["close"][m - 1]
@@ -233,6 +264,7 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": side,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         else:
@@ -245,6 +277,7 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": side,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         print(ordertailingSL)
@@ -278,6 +311,7 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         else:
@@ -291,6 +325,7 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
                     "callbackRate": callbackrate,
                     "reduceOnly": True,
                     "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         print(ordertailingSL)
@@ -321,6 +356,7 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
                     "stopPrice": float(high),
                     "triggerPrice": float(high),
                     "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(orderSL)
@@ -336,6 +372,7 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
                     "triggerPrice": float(high),
                     "reduceOnly": True,
                     "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         return high
@@ -360,6 +397,7 @@ async def USESLLONG(symbol, exchange, amount, low, side):
                     "stopPrice": float(low),
                     "triggerPrice": float(low),
                     "positionSide": side,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         else:
@@ -374,6 +412,7 @@ async def USESLLONG(symbol, exchange, amount, low, side):
                     "triggerPrice": float(low),
                     "reduceOnly": True,
                     "positionSide": side,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
         print(orderSL)
@@ -401,6 +440,7 @@ async def USETPLONG(
                 "stopPrice": stop_price,
                 "triggerPrice": stop_price,
                 "positionSide": Lside,
+                "newClientOrderId": "vxmaBot",
             },
         )
         print(orderTP)
@@ -418,6 +458,7 @@ async def USETPLONG(
                     "stopPrice": triggerPrice,
                     "triggerPrice": triggerPrice,
                     "positionSide": Lside,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(orderTP2)
@@ -427,26 +468,6 @@ async def USETPLONG(
         lastUpdate.status = f"{e}"
         notify_send(f"เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ{e}")
         return None
-
-
-async def fetching_balance():
-    exchange = await connect()
-    try:
-        balance = await exchange.fetch_balance()
-        await disconnect(exchange)
-        return balance
-    except Exception as e:
-        lastUpdate.status = f"{e}"
-        await disconnect(exchange)
-        exchange = await connect()
-        balance = await exchange.fetch_balance()
-        await disconnect(exchange)
-        return balance
-
-
-async def fetching_fiat_balance():
-    balance = await fetching_balance()
-    return {x: y for x, y in balance.items() if "USD" in x[-4:]}
 
 
 # Position Sizing
@@ -495,10 +516,13 @@ def sellsize(df, balance, symbol, exchange, RISK, min_amount):
 
 
 # OpenLong=Buy
-async def OpenLong(df, balance, risk_manage, Lside, min_balance):
+async def OpenLong(
+    df, balance, risk_manage, Lside, min_balance, clearorder: bool = True
+):
     exchange = await connect_loads()
     try:
-        await exchange.cancel_all_orders(risk_manage["symbol"])
+        if clearorder:
+            await exchange.cancel_all_orders(risk_manage["symbol"])
         markets = await exchange.fetchMarkets()
         min_amount = float(
             (
@@ -540,7 +564,10 @@ async def OpenLong(df, balance, risk_manage, Lside, min_balance):
                     risk_manage["symbol"],
                     "buy",
                     amount,
-                    params={"positionSide": Lside},
+                    params={
+                        "positionSide": Lside,
+                        "newClientOrderId": "vxmaBot",
+                    },
                 )
                 print(order)
                 margin = ask * amount / int(leve)
@@ -636,6 +663,7 @@ async def USETPSHORT(
                 "stopPrice": triggerPrice,
                 "triggerPrice": triggerPrice,
                 "positionSide": Sside,
+                "newClientOrderId": "vxmaBot",
             },
         )
         print(orderTP)
@@ -653,6 +681,7 @@ async def USETPSHORT(
                     "stopPrice": triggerPrice,
                     "triggerPrice": triggerPrice,
                     "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(orderTP2)
@@ -665,10 +694,13 @@ async def USETPSHORT(
 
 
 # OpenShort=Sell
-async def OpenShort(df, balance, risk_manage, Sside, min_balance):
+async def OpenShort(
+    df, balance, risk_manage, Sside, min_balance, clearorder: bool = True
+):
     exchange = await connect_loads()
     try:
-        await exchange.cancel_all_orders(risk_manage["symbol"])
+        if clearorder:
+            await exchange.cancel_all_orders(risk_manage["symbol"])
         markets = await exchange.fetchMarkets()
         min_amount = float(
             (
@@ -710,7 +742,10 @@ async def OpenShort(df, balance, risk_manage, Sside, min_balance):
                     risk_manage["symbol"],
                     "sell",
                     amount,
-                    params={"positionSide": Sside},
+                    params={
+                        "positionSide": Sside,
+                        "newClientOrderId": "vxmaBot",
+                    },
                 )
                 print(order)
                 margin = bid * amount / int(leve)
@@ -798,14 +833,26 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
         bid = await get_bidask(symbol, exchange, "bid")
         try:
             order = await exchange.create_market_order(
-                symbol, "sell", amount, params={"positionSide": Lside}
+                symbol,
+                "sell",
+                amount,
+                params={
+                    "positionSide": Lside,
+                    "newClientOrderId": "vxmaBot",
+                },
             )
         except Exception as e:
             lastUpdate.status = f"{e}"
             await disconnect(exchange)
             exchange = await connect_loads()
             order = await exchange.create_market_order(
-                symbol, "sell", amount, params={"positionSide": Lside}
+                symbol,
+                "sell",
+                amount,
+                params={
+                    "positionSide": Lside,
+                    "newClientOrderId": "vxmaBot",
+                },
             )
             print(order)
         total = float(balance["total"][quote])
@@ -841,14 +888,26 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
         ask = await get_bidask(symbol, exchange, "ask")
         try:
             order = await exchange.create_market_order(
-                symbol, "buy", amount, params={"positionSide": Sside}
+                symbol,
+                "buy",
+                amount,
+                params={
+                    "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
+                },
             )
         except Exception as e:
             lastUpdate.status = f"{e}"
             await disconnect(exchange)
             exchange = await connect_loads()
             order = await exchange.create_market_order(
-                symbol, "buy", amount, params={"positionSide": Sside}
+                symbol,
+                "buy",
+                amount,
+                params={
+                    "positionSide": Sside,
+                    "newClientOrderId": "vxmaBot",
+                },
             )
             print(order)
         total = float(balance["total"][quote])
@@ -961,9 +1020,24 @@ async def feed(
         and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.symbols
     ):
         notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
+        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+        write_trade_record(
+            time_now,
+            risk_manage["symbol"],
+            (amt_long + amt_short),
+            df["close"][last],
+            "Stop-Loss",
+            pnl=float(risk_manage["risk_size"][1:]),
+        )
+        candle(
+            df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}"
+        )
         alrnotify.symbols.append(f"{risk_manage['symbol']}{df.index[last]}")
 
-    if df["BUY"][last] == 1:
+    if (
+        df["BUY"][last] == 1
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.orders
+    ):
         lastUpdate.status = "changed to Bullish, buy"
         if is_in_Short:
             lastUpdate.status = "closeshort"
@@ -976,6 +1050,7 @@ async def feed(
                 currentMode.Sside,
                 risk_manage["timeframe"],
             )
+            account_balance.update_balance()
             if risk_manage["use_long"]:
                 await OpenLong(
                     df,
@@ -984,22 +1059,33 @@ async def feed(
                     currentMode.Lside,
                     min_balance,
                 )
-            else:
-                lastUpdate.status = (
-                    "No permission for excute order : Do nothing"
+                account_balance.update_balance()
+                alrnotify.orders.append(
+                    f"{risk_manage['symbol']}{df.index[last]}"
                 )
+            else:
+                print("No permission for excute order : Do nothing")
 
-        elif not is_in_Long and risk_manage["use_long"]:
-            await OpenLong(
-                df,
-                balance,
-                risk_manage,
-                currentMode.Lside,
-                min_balance,
-            )
         else:
-            lastUpdate.status = "already in position, nothing to do"
-    if df["SELL"][last] == 1:
+            if risk_manage["use_long"]:
+                await OpenLong(
+                    df,
+                    balance,
+                    risk_manage,
+                    currentMode.Lside,
+                    min_balance,
+                )
+                account_balance.update_balance()
+                alrnotify.orders.append(
+                    f"{risk_manage['symbol']}{df.index[last]}"
+                )
+            else:
+                print("No permission for excute order : Do nothing")
+
+    if (
+        df["SELL"][last] == 1
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.orders
+    ):
         lastUpdate.status = "changed to Bearish, Sell"
         if is_in_Long:
             lastUpdate.status = "closelong"
@@ -1012,6 +1098,7 @@ async def feed(
                 currentMode.Lside,
                 risk_manage["timeframe"],
             )
+            account_balance.update_balance()
             if risk_manage["use_short"]:
                 await OpenShort(
                     df,
@@ -1020,17 +1107,200 @@ async def feed(
                     currentMode.Sside,
                     min_balance,
                 )
-            else:
-                lastUpdate.status = (
-                    "No permission for excute order : Do nothing"
+                account_balance.update_balance()
+                alrnotify.orders.append(
+                    f"{risk_manage['symbol']}{df.index[last]}"
                 )
-        elif not is_in_Short and risk_manage["use_short"]:
+            else:
+                print("No permission for excute order : Do nothing")
+        else:
+            if risk_manage["use_short"]:
+                await OpenShort(
+                    df,
+                    balance,
+                    risk_manage,
+                    currentMode.Sside,
+                    min_balance,
+                )
+                account_balance.update_balance()
+                alrnotify.orders.append(
+                    f"{risk_manage['symbol']}{df.index[last]}"
+                )
+            else:
+                print("No permission for excute order : Do nothing")
+
+
+async def feed_hedge(
+    df,
+    df_trend,
+    risk_manage,
+    balance,
+    min_balance,
+    status,
+):
+    posim = risk_manage["symbol"][:-5].replace("/", "")
+    if status is None:
+        return
+    status = status[status["symbol"] == posim]
+
+    if status.empty:
+        amt_short = 0.0
+        amt_long = 0.0
+        upnl_short = 0.0
+        upnl_long = 0.0
+    elif len(status.index) > 1:
+        amt_long = (
+            status["positionAmt"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "LONG"
+        ).__next__()
+        amt_short = (
+            status["positionAmt"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "SHORT"
+        ).__next__()
+        upnl_long = (
+            status["unrealizedProfit"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "LONG"
+        ).__next__()
+        upnl_short = (
+            status["unrealizedProfit"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == "SHORT"
+        ).__next__()
+    else:
+        amt = float(
+            (
+                status["positionAmt"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+            ).__next__()
+        )
+        amt_long = amt if amt > 0 else 0.0
+        amt_short = amt if amt < 0 else 0.0
+        upnl = float(
+            (
+                status["unrealizedProfit"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+            ).__next__()
+        )
+        upnl_long = upnl if amt != 0 else 0.0
+        upnl_short = upnl if amt != 0 else 0.0
+
+    is_in_Long = True if amt_long != 0 else False
+    is_in_Short = True if amt_short != 0 else False
+
+    last = len(df.index) - 1
+    last_b = len(df_trend.index) - 1
+    if (
+        df["isSL"][last] == 1
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.symbols
+    ):
+        notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
+        time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+        write_trade_record(
+            time_now,
+            risk_manage["symbol"],
+            (amt_long + amt_short),
+            df["close"][last],
+            "Stop-Loss",
+            pnl=float(risk_manage["risk_size"][1:]),
+        )
+        candle(
+            df,
+            risk_manage["symbol"],
+            f"{risk_manage['hedge_timeframe']} {time_now}",
+        )
+        alrnotify.symbols.append(f"{risk_manage['symbol']}{df.index[last]}")
+
+    # Open Long if ther higher trend are bullish
+    # but got bearish signal on lower timeframe
+    if (
+        df["BUY"][last] == 1
+        and df_trend["trend"][last_b] == 0
+        and is_in_Short
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.orders
+    ):
+        print("hedging changed to Bullish, buy")
+        if risk_manage["use_long"]:
+            await OpenLong(
+                df,
+                balance,
+                risk_manage,
+                currentMode.Lside,
+                min_balance,
+                False,
+            )
+            account_balance.update_balance()
+            alrnotify.orders.append(f"{risk_manage['symbol']}{df.index[last]}")
+        else:
+            print("No permission for excute order : Do nothing")
+
+    # Close Short if the higher trend are bullish
+    # and have a hedging position
+    if (
+        df["BUY"][last] == 1
+        and df_trend["trend"][last_b] == 1
+        and is_in_Short
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.orders
+    ):
+        print("hedging changed to Bullish, closeshort buy")
+        await CloseShort(
+            df,
+            balance,
+            risk_manage["symbol"],
+            amt_short,
+            upnl_short,
+            currentMode.Sside,
+            risk_manage["hedge_timeframe"],
+        )
+        account_balance.update_balance()
+
+    # Open Short if the higher trend are bullish
+    # but got Sell signal form lower timeframe
+    if (
+        df["SELL"][last] == 1
+        and df_trend["trend"][last_b] == 1
+        and is_in_Long
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.orders
+    ):
+        print("hedging changed to Bearish, Sell")
+        if risk_manage["use_short"]:
             await OpenShort(
                 df,
                 balance,
                 risk_manage,
                 currentMode.Sside,
                 min_balance,
+                False,
             )
+            account_balance.update_balance()
+            alrnotify.orders.append(f"{risk_manage['symbol']}{df.index[last]}")
         else:
-            lastUpdate.status = "already in position, nothing to do"
+            print("No permission for excute order : Do nothing")
+
+    # Close Long position if the higher timeframe are bearish
+    # and have a Hedging position
+    if (
+        df["SELL"][last] == 1
+        and df_trend["trend"][last_b] == 0
+        and is_in_Long
+        and f"{risk_manage['symbol']}{df.index[last]}" not in alrnotify.orders
+    ):
+        print("hedging changed to Bearish, Sell")
+        await CloseLong(
+            df,
+            balance,
+            risk_manage["symbol"],
+            amt_long,
+            upnl_long,
+            currentMode.Lside,
+            risk_manage["hedge_timeframe"],
+        )
+        account_balance.update_balance()
