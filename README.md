@@ -57,6 +57,11 @@ password = 'vxmaBot'
 │   ├── Update Candle faster
 │   ├── Fixed bug order
 │   ├── SL notification 
+├─ 0.1.4  
+│   ├── Added Hedging Strategy
+│   ├── Update Balance faster
+│   ├── Fixed bug 
+│   ├── Add OrderClientId for future-use 
 ```
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)
@@ -69,41 +74,39 @@ password = 'vxmaBot'
 ### Structure
 ```
 vxma_web/
-├── vxma_d
-│   ├── AppData
+├── app.py
+├── bot_config.csv
+├── Dockerfile
+├── install.sh
+├── LICENSE
+├── pip_freeze.txt
+├── README.md
+├── requirements.txt
+├── run_docker.sh
+├── run.sh
+├── tester.py
+├── TODO
+├── trades.csv
+├── vxma_d/
+│   ├── AppData/
 │   │   ├── Appdata.py
 │   │   ├── Bot.py
 │   │   ├── __init__.py
 │   │   └── ResetDatabase.py
-│   ├── Backtesting
+│   ├── Backtesting/
 │   │   ├── Candle_ohlc.py
-│   │   └── __init__.py
-│   ├── MarketEX
+│   │   ├── __init__.py
+│   ├── __init__.py
+│   ├── MarketEX/
 │   │   ├── CCXT_Binance.py
-│   │   └── __init__.py
-│   ├── Strategy
+│   │   ├── __init__.py
+│   ├── Strategy/
 │   │   ├── Benchmarking.py
 │   │   ├── ematalib.py
 │   │   ├── __init__.py
-│   │   ├── vxma_talib.py
-│   ├── web
-│   │   ├── __init__.py
-│   │   └── web.py
-│   └── __init__.py
-├── app.py
-├── bot_config.csv
-├── candle.png
-├── Dockerfile
-├── LICENSE
-├── log.log
-├── README.md
-├── requirements_docker.txt
-├── requirements_pandas.txt
-├── requirements_talib.txt
-├── requirements.txt
-├── run.sh
-├── tester.py
-├── TODO
-├── vxma.db
+│   │   └── vxma_talib.py
+│   └── web/
+│       ├── __init__.py
+│       └── web.py
 └── web_app.py
 ```
