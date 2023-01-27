@@ -483,9 +483,9 @@ async def waiting():
 async def get_waiting_time():
     symbolist = bot_setting()
     try:
-        all_timeframes = [x for x in symbolist["timeframe"]] + [
-            y for y in symbolist["hedgeTF"]
-        ]
+        all_timeframes = (
+            symbolist["timeframe"].tolist() + symbolist["hedgeTF"].tolist()
+        )
         tf_secconds = [TIMEFRAME_SECONDS[x] for x in all_timeframes]
         timer.min_timewait = min(tf_secconds)
         if timer.min_timewait >= 3600:
@@ -514,9 +514,10 @@ async def warper_fn():
                 await asyncio.sleep(60)
                 return
 
-            all_timeframes = [x for x in symbolist["timeframe"]] + [
-                y for y in symbolist["hedgeTF"]
-            ]
+            all_timeframes = (
+                symbolist["timeframe"].tolist() + symbolist["hedgeTF"].tolist()
+            )
+
             tf_secconds = [TIMEFRAME_SECONDS[x] for x in all_timeframes]
 
             if timer.min_timewait != min(tf_secconds):

@@ -352,7 +352,6 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
                     "stopPrice": float(high),
                     "triggerPrice": float(high),
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(orderSL)
@@ -368,7 +367,6 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
                     "triggerPrice": float(high),
                     "reduceOnly": True,
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         return high
@@ -393,7 +391,6 @@ async def USESLLONG(symbol, exchange, amount, low, side):
                     "stopPrice": float(low),
                     "triggerPrice": float(low),
                     "positionSide": side,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         else:
@@ -408,14 +405,13 @@ async def USESLLONG(symbol, exchange, amount, low, side):
                     "triggerPrice": float(low),
                     "reduceOnly": True,
                     "positionSide": side,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         print(orderSL)
         return low
     except Exception as e:
         lastUpdate.status = f"{e}"
-        notify_send(f"เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ{e}")
+        notify_send(f"เกิดเตุการณืไม่คาดฝัน Order SL  ทำรายการไม่สำเร็จ{e}")
         return 0.0
 
 
@@ -436,7 +432,6 @@ async def USETPLONG(
                 "stopPrice": stop_price,
                 "triggerPrice": stop_price,
                 "positionSide": Lside,
-                "newClientOrderId": "vxmaBot",
             },
         )
         print(orderTP)
@@ -454,7 +449,6 @@ async def USETPLONG(
                     "stopPrice": triggerPrice,
                     "triggerPrice": triggerPrice,
                     "positionSide": Lside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(orderTP2)
@@ -659,7 +653,6 @@ async def USETPSHORT(
                 "stopPrice": triggerPrice,
                 "triggerPrice": triggerPrice,
                 "positionSide": Sside,
-                "newClientOrderId": "vxmaBot",
             },
         )
         print(orderTP)
@@ -677,7 +670,6 @@ async def USETPSHORT(
                     "stopPrice": triggerPrice,
                     "triggerPrice": triggerPrice,
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(orderTP2)
@@ -834,7 +826,6 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
                 amount,
                 params={
                     "positionSide": Lside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         except Exception as e:
@@ -847,7 +838,6 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
                 amount,
                 params={
                     "positionSide": Lside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(order)
@@ -889,7 +879,6 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
                 amount,
                 params={
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
         except Exception as e:
@@ -902,7 +891,6 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
                 amount,
                 params={
                     "positionSide": Sside,
-                    "newClientOrderId": "vxmaBot",
                 },
             )
             print(order)
@@ -963,30 +951,38 @@ async def feed(
         upnl_short = 0.0
         upnl_long = 0.0
     elif len(status.index) > 1:
-        amt_long = (
-            status["positionAmt"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "LONG"
-        ).__next__()
-        amt_short = (
-            status["positionAmt"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "SHORT"
-        ).__next__()
-        upnl_long = (
-            status["unrealizedProfit"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "LONG"
-        ).__next__()
-        upnl_short = (
-            status["unrealizedProfit"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "SHORT"
-        ).__next__()
+        amt_long = float(
+            (
+                status["positionAmt"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "LONG"
+            ).__next__()
+        )
+        amt_short = float(
+            (
+                status["positionAmt"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "SHORT"
+            ).__next__()
+        )
+        upnl_long = float(
+            (
+                status["unrealizedProfit"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "LONG"
+            ).__next__()
+        )
+        upnl_short = float(
+            (
+                status["unrealizedProfit"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "SHORT"
+            ).__next__()
+        )
     else:
         amt = float(
             (
@@ -1145,30 +1141,38 @@ async def feed_hedge(
         upnl_short = 0.0
         upnl_long = 0.0
     elif len(status.index) > 1:
-        amt_long = (
-            status["positionAmt"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "LONG"
-        ).__next__()
-        amt_short = (
-            status["positionAmt"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "SHORT"
-        ).__next__()
-        upnl_long = (
-            status["unrealizedProfit"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "LONG"
-        ).__next__()
-        upnl_short = (
-            status["unrealizedProfit"][i]
-            for i in status.index
-            if status["symbol"][i] == posim
-            and status["positionSide"][i] == "SHORT"
-        ).__next__()
+        amt_long = float(
+            (
+                status["positionAmt"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "LONG"
+            ).__next__()
+        )
+        amt_short = float(
+            (
+                status["positionAmt"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "SHORT"
+            ).__next__()
+        )
+        upnl_long = float(
+            (
+                status["unrealizedProfit"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "LONG"
+            ).__next__()
+        )
+        upnl_short = float(
+            (
+                status["unrealizedProfit"][i]
+                for i in status.index
+                if status["symbol"][i] == posim
+                and status["positionSide"][i] == "SHORT"
+            ).__next__()
+        )
     else:
         amt = float(
             (
