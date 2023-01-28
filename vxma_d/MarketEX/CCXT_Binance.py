@@ -1,5 +1,5 @@
 import asyncio  # pyright: ignore # noqa:
-
+from datetime import datetime
 import ccxt.async_support as ccxt
 import pandas as pd
 
@@ -71,6 +71,12 @@ def callbackRate(data, direction):
     except Exception as e:
         lastUpdate.status = f"callbackRate is error : {e}"
         return 2.5
+
+
+def get_order_id() -> str:
+    """ """
+    id = datetime.now().isoformat()
+    return f"vxma_{id}"
 
 
 # TP with Risk:Reward
@@ -250,6 +256,7 @@ def RR1(stop, side, price, symbol, exchange):
 
 async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
     try:
+        orderid = get_order_id()
         triggerPrice = RR1(low, True, ask, symbol, exchange)
         if triggerPrice is None:
             return
@@ -264,6 +271,7 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": side,
+                    "newClientOrderId": orderid,
                 },
             )
         else:
@@ -276,6 +284,7 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": side,
+                    "newClientOrderId": orderid,
                 },
             )
         print(ordertailingSL)
@@ -295,6 +304,7 @@ async def TailingLongOrder(df, symbol, exchange, ask, amount, low, side):
 
 async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
     try:
+        orderid = get_order_id()
         triggerPrice = RR1(high, False, bid, symbol, exchange)
         if triggerPrice is None:
             return
@@ -309,6 +319,7 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
                     "activationPrice": triggerPrice,
                     "callbackRate": callbackrate,
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
         else:
@@ -322,6 +333,7 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
                     "callbackRate": callbackrate,
                     "reduceOnly": True,
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
         print(ordertailingSL)
@@ -341,6 +353,7 @@ async def TailingShortOrder(df, symbol, exchange, bid, amount, high, Sside):
 
 async def USESLSHORT(symbol, exchange, amount, high, Sside):
     try:
+        orderid = get_order_id()
         if currentMode.dualSidePosition:
             orderSL = await exchange.create_order(
                 symbol,
@@ -352,6 +365,7 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
                     "stopPrice": float(high),
                     "triggerPrice": float(high),
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
             print(orderSL)
@@ -367,6 +381,7 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
                     "triggerPrice": float(high),
                     "reduceOnly": True,
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
         return high
@@ -380,6 +395,7 @@ async def USESLSHORT(symbol, exchange, amount, high, Sside):
 
 async def USESLLONG(symbol, exchange, amount, low, side):
     try:
+        orderid = get_order_id()
         if currentMode.dualSidePosition:
             orderSL = await exchange.create_order(
                 symbol,
@@ -391,6 +407,7 @@ async def USESLLONG(symbol, exchange, amount, low, side):
                     "stopPrice": float(low),
                     "triggerPrice": float(low),
                     "positionSide": side,
+                    "newClientOrderId": orderid,
                 },
             )
         else:
@@ -405,6 +422,7 @@ async def USESLLONG(symbol, exchange, amount, low, side):
                     "triggerPrice": float(low),
                     "reduceOnly": True,
                     "positionSide": side,
+                    "newClientOrderId": orderid,
                 },
             )
         print(orderSL)
@@ -422,6 +440,7 @@ async def USETPLONG(
         stop_price = exchange.price_to_precision(
             symbol, RRTP(df, True, 1, ask, TPRR1, TPRR2)
         )
+        orderid = get_order_id()
         orderTP = await exchange.create_order(
             symbol,
             "TAKE_PROFIT_MARKET",
@@ -432,6 +451,7 @@ async def USETPLONG(
                 "stopPrice": stop_price,
                 "triggerPrice": stop_price,
                 "positionSide": Lside,
+                "newClientOrderId": orderid,
             },
         )
         print(orderTP)
@@ -439,6 +459,7 @@ async def USETPLONG(
             triggerPrice = exchange.price_to_precision(
                 symbol, RRTP(df, True, 2, ask, TPRR1, TPRR2)
             )
+            orderid = get_order_id()
             orderTP2 = await exchange.create_order(
                 symbol,
                 "TAKE_PROFIT_MARKET",
@@ -449,6 +470,7 @@ async def USETPLONG(
                     "stopPrice": triggerPrice,
                     "triggerPrice": triggerPrice,
                     "positionSide": Lside,
+                    "newClientOrderId": orderid,
                 },
             )
             print(orderTP2)
@@ -550,13 +572,14 @@ async def OpenLong(
         quote = risk_manage["quote"]
         if free > min_balance:
             try:
+                orderid = get_order_id()
                 order = await exchange.create_market_order(
                     risk_manage["symbol"],
                     "buy",
                     amount,
                     params={
                         "positionSide": Lside,
-                        "newClientOrderId": "vxmaBot",
+                        "newClientOrderId": orderid,
                     },
                 )
                 print(order)
@@ -643,6 +666,7 @@ async def USETPSHORT(
         triggerPrice = exchange.price_to_precision(
             symbol, RRTP(df, False, 1, bid, TPRR1, TPRR2)
         )
+        orderid = get_order_id()
         orderTP = await exchange.create_order(
             symbol,
             "TAKE_PROFIT_MARKET",
@@ -653,6 +677,7 @@ async def USETPSHORT(
                 "stopPrice": triggerPrice,
                 "triggerPrice": triggerPrice,
                 "positionSide": Sside,
+                "newClientOrderId": orderid,
             },
         )
         print(orderTP)
@@ -660,6 +685,7 @@ async def USETPSHORT(
             triggerPrice2 = exchange.price_to_precision(
                 symbol, RRTP(df, False, 2, bid, TPRR1, TPRR2)
             )
+            orderid = get_order_id()
             orderTP2 = await exchange.create_order(
                 symbol,
                 "TAKE_PROFIT_MARKET",
@@ -670,6 +696,7 @@ async def USETPSHORT(
                     "stopPrice": triggerPrice,
                     "triggerPrice": triggerPrice,
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
             print(orderTP2)
@@ -726,13 +753,14 @@ async def OpenShort(
         quote = risk_manage["quote"]
         if free > min_balance:
             try:
+                orderid = get_order_id()
                 order = await exchange.create_market_order(
                     risk_manage["symbol"],
                     "sell",
                     amount,
                     params={
                         "positionSide": Sside,
-                        "newClientOrderId": "vxmaBot",
+                        "newClientOrderId": orderid,
                     },
                 )
                 print(order)
@@ -819,6 +847,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
         upnl = pnl
         quote = symbol[-4:]
         bid = await get_bidask(symbol, exchange, "bid")
+        orderid = get_order_id()
         try:
             order = await exchange.create_market_order(
                 symbol,
@@ -826,6 +855,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
                 amount,
                 params={
                     "positionSide": Lside,
+                    "newClientOrderId": orderid,
                 },
             )
         except Exception as e:
@@ -838,6 +868,7 @@ async def CloseLong(df, balance, symbol, amt, pnl, Lside, tf):
                 amount,
                 params={
                     "positionSide": Lside,
+                    "newClientOrderId": orderid,
                 },
             )
             print(order)
@@ -870,6 +901,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
         exchange = await connect_loads()
         amount = abs(amt)
         quote = symbol[-4:]
+        orderid = get_order_id()
         upnl = pnl
         ask = await get_bidask(symbol, exchange, "ask")
         try:
@@ -879,6 +911,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
                 amount,
                 params={
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
         except Exception as e:
@@ -891,6 +924,7 @@ async def CloseShort(df, balance, symbol, amt, pnl, Sside, tf):
                 amount,
                 params={
                     "positionSide": Sside,
+                    "newClientOrderId": orderid,
                 },
             )
             print(order)
