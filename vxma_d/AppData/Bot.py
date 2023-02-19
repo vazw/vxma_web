@@ -8,7 +8,6 @@ from datetime import datetime
 import pandas as pd
 
 from vxma_d.AppData import (
-    alrnotify,
     colorCS,
     lastUpdate,
     timer,
@@ -36,7 +35,7 @@ from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 from vxma_d.Strategy.vxma_talib import vxma as ta
 
 
-bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.3) github.com/vazw/vxma_web"
+bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.4) github.com/vazw/vxma_web"
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -215,7 +214,7 @@ async def get_dailytasks():
 
             # candle(df3, symbol, "1h")
             if df1 is not None:
-                time_now = f"{(lastUpdate.candle)[:-10].replace('T',' at ')}"
+                time_now = lastUpdate.candle
                 candle(df1, symbol, f"1d {time_now}")
                 long_term = ta_score(df1)
                 mid_term = ta_score(df2)
@@ -237,6 +236,24 @@ async def get_dailytasks():
 
 def remove_last_line_from_string(text):
     return text[: text.rfind("\n")]
+
+
+def write_daily_balance():
+    fiat_balance = account_balance.fiat_balance
+    total_balance = (
+        fiat_balance["BUSD"]["total"] + fiat_balance["USDT"]["total"]
+    )
+    local_time = time.ctime(time.time())
+    df = pd.DataFrame(
+        {
+            "DateTime": [local_time],
+            "Total": [total_balance],
+        }
+    )
+
+    # Append the dataframe to the CSV file
+    # df.to_csv("balance.csv", index=False, header=True)
+    df.to_csv("balance.csv", mode="a", index=False, header=False)
 
 
 async def hourly_report():
@@ -276,8 +293,6 @@ async def hourly_report():
 async def dailyreport():
     lastUpdate.status = "Daily Report"
     candle_ohlc.clear()
-    alrnotify.orders.clear()
-    alrnotify.symbols.clear()
     try:
         notify_send(
             "คู่เทรดที่น่าสนใจในวันนี้\n",
@@ -428,12 +443,11 @@ async def running_module():
 
         except Exception as e:
             lastUpdate.status = f"{e}"
-            pass
+            continue
 
 
 async def waiting():
-    text_time = f"{colorCS.CYELLOW} เวลา {colorCS.CGREEN}"
-    time_now = f"{(lastUpdate.candle)[:-10].replace('T',text_time)}"
+    time_now = lastUpdate.candle
     balance = account_balance.balance
     positions = balance["info"]["positions"]
     status = pd.DataFrame(
@@ -449,23 +463,21 @@ async def waiting():
     )
 
     status["initialMargin"] = (status["initialMargin"]).astype("float64")
-    margin = float((status["initialMargin"]).astype("float64").sum())
     netunpl = float((status["unrealizedProfit"]).astype("float64").sum())
     status.rename(columns=common_names, errors="ignore", inplace=True)
     print(tabulate(status, showindex=False, headers="keys"))
-    try:
-        print(
-            f"Margin Used : {colorCS.CBOLD + colorCS.CRED}{round(margin, 3)} ${colorCS.CEND}"  # noqa:
-            + f"  NET P/L : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
-            + f" Balance : BUSD {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance['BUSD']} ${colorCS.CEND}"  # noqa:
-            + f" USDT {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance['USDT']} ${colorCS.CEND}"  # noqa:
-        )
-    except Exception:  # noqa:
-        print(
-            f"Margin Used : {colorCS.CBOLD + colorCS.CRED}{round(margin, 3)} ${colorCS.CEND}"  # noqa:
-            + f"  NET P/L : {colorCS.CBOLD + colorCS.CGREEN}{round(netunpl, 3)} ${colorCS.CEND}"  # noqa:
-            + f" Balance : {colorCS.CBOLD + colorCS.CGREEN}{lastUpdate.balance} ${colorCS.CEND}"  # noqa:
-        )
+    fiat_balance = account_balance.fiat_balance
+    lastUpdate.balance = fiat_balance
+    print(
+        "\n BUSD"
+        + f"\nFree   : {round(fiat_balance['BUSD']['free'],2)}$"
+        + f"\nMargin : {round(fiat_balance['BUSD']['used'],2)}$"
+        + f"\nTotal  : {round(fiat_balance['BUSD']['total'],2)}$\nUSDT"
+        + f"\nFree   : {round(fiat_balance['USDT']['free'],2)}$"
+        + f"\nMargin : {round(fiat_balance['USDT']['used'],2)}$"
+        + f"\nTotal  : {round(fiat_balance['USDT']['total'],2)}$"
+        + f"\nNet Profit/Loss  : {round(netunpl,2)}$"
+    )
     print(
         "\r"
         + colorCS.CRED
@@ -495,8 +507,9 @@ async def get_waiting_time():
             for i in all_timeframes
             if TIMEFRAME_SECONDS[i] == timer.min_timewait
         )
-        lastUpdate.candle = f"{datetime.now().isoformat()}"
-        await running_module()
+        timer.get_time = True
+        lastUpdate.candle = time.ctime(time.time())
+        await fetchbars("BTCUSDT", timer.min_timeframe)
         timer.next_candle = timer.last_closed + timer.min_timewait
     except Exception as e:
         print(f"fail to set min time :{e}")
@@ -533,18 +546,18 @@ async def warper_fn():
                 insession["hour"] = True
                 await asyncio.gather(dailyreport())
                 await hourly_report()
+                write_daily_balance()
 
             if str(local_time[14:-9]) == "0" and not insession["hour"]:
                 await hourly_report()
                 await waiting()
 
-            t1 = time.time()
-            if t1 >= timer.next_candle:
-                lastUpdate.candle = f"{datetime.now().isoformat()}"
+            if time.time() >= timer.next_candle:
+                lastUpdate.candle = time.ctime(time.time())
                 await running_module()
                 timer.next_candle += timer.min_timewait
             else:
-                await asyncio.sleep(round(timer.next_candle - t1))
+                await asyncio.sleep(timer.next_candle - time.time())
 
         except Exception as e:
             lastUpdate.status = f"{e}"

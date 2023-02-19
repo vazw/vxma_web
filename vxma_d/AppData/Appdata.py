@@ -169,14 +169,6 @@ class RiskManageTable:
         return True if str(arg).lower() == "true" else False
 
 
-class Notified:
-    """List of notified SL."""
-
-    def __init__(self):
-        self.symbols = []
-        self.orders = []
-
-
 @dataclass
 class Last_update:
     candle: str = "T -- ----------"
@@ -190,6 +182,7 @@ class Timer:
     min_timeframe: str = "1m"
     last_closed: any = 0.0
     next_candle: any = 0.0
+    get_time: bool = False
 
 
 @dataclass
@@ -335,28 +328,132 @@ def clearconsol():
         print(e)
 
 
+def read_all_open_position_record():
+    order_history = pd.read_csv("trades.csv")
+    order_history = order_history[pd.isnull(order_history["ClosePrice"])]
+    return order_history
+
+
+def read_one_open_trade_record(
+    symbol: str,
+    timeframe: str,
+    direction: str = "",
+):
+    order_history = pd.read_csv("trades.csv")
+    position = None
+    for id in order_history.index:
+        if (
+            order_history["Symbol"][id] == symbol
+            and pd.isnull(order_history["ClosePrice"][id])
+            and order_history["Position"][id] == direction
+            and order_history["TF"][id] == timeframe
+        ):
+            position = order_history.loc[
+                id,
+            ]
+            break
+    return position
+
+
 def write_trade_record(
     timestamp: datetime,
     symbol: str,
+    timeframe: str,
     amount: float,
     price: float,
     direction: str,
     tp: any = None,
     sl: float = None,
-    pnl: float = None,
 ):
     # Create a dataframe from the input data
     df = pd.DataFrame(
         {
-            "DateTime": [timestamp],
+            "EntryTime": [timestamp],
+            "ExitTime": [None],
             "Symbol": [symbol],
-            "Amount": [amount],
-            "Price": [price],
+            "TF": [timeframe],
             "Position": [direction],
-            "TP/SL": [f"{tp}/{sl}"],
-            "PNL$": [f"{round(pnl,2) if pnl is not None else None}"],
+            "Amount": [amount],
+            "EntryPrice": [price],
+            "ClosePrice": [None],
+            "TP": [tp],
+            "SL": [sl],
+            "PNL$": [None],
         }
     )
 
     # Append the dataframe to the CSV file
+    # df.to_csv("trades.csv", index=False, header=True)
     df.to_csv("trades.csv", mode="a", index=False, header=False)
+
+
+def edit_trade_record(
+    timestamp: datetime,
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    price: float,
+    isSl: bool = False,
+):
+    # Create a dataframe from the input data
+    order_history = pd.read_csv("trades.csv")
+    for id in order_history.index:
+        if (
+            order_history["Symbol"][id] == symbol
+            and pd.isnull(order_history["ClosePrice"][id])
+            and order_history["Position"][id] == direction
+            and order_history["TF"][id] == timeframe
+        ):
+            order_history["ExitTime"][id] = timestamp
+            if isSl:
+                order_history["ClosePrice"][id] = order_history["SL"][id]
+            else:
+                order_history["ClosePrice"][id] = price
+
+            if order_history["Position"][id] == "Long":
+                order_history["PNL$"][id] = (
+                    order_history["ClosePrice"][id]
+                    - order_history["EntryPrice"][id]
+                ) * order_history["Amount"][id]
+            else:
+                order_history["PNL$"][id] = (
+                    order_history["EntryPrice"][id]
+                    - order_history["ClosePrice"][id]
+                ) * order_history["Amount"][id]
+    # rewrite the whole dataframe to the CSV file
+    order_history.to_csv("trades.csv", index=False, header=True)
+
+
+def edit_all_trade_record(
+    timestamp: datetime,
+    symbol: str,
+    direction: str,
+    price: float,
+    isSl: bool = False,
+):
+    # Create a dataframe from the input data
+    order_history = pd.read_csv("trades.csv")
+    for id in order_history.index:
+        if (
+            order_history["Symbol"][id] == symbol
+            and pd.isnull(order_history["ClosePrice"][id])
+            and order_history["Position"][id] == direction
+        ):
+            order_history["ExitTime"][id] = timestamp
+            if isSl:
+                order_history["ClosePrice"][id] = order_history["SL"][id]
+            else:
+                order_history["ClosePrice"][id] = price
+
+            if order_history["Position"][id] == "Long":
+                order_history["PNL$"][id] = (
+                    order_history["ClosePrice"][id]
+                    - order_history["EntryPrice"][id]
+                ) * order_history["Amount"][id]
+            else:
+                order_history["PNL$"][id] = (
+                    order_history["EntryPrice"][id]
+                    - order_history["ClosePrice"][id]
+                ) * order_history["Amount"][id]
+    # rewrite the whole dataframe to the CSV file
+    order_history.to_csv("trades.csv", index=False, header=True)

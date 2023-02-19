@@ -1,2 +1,1 @@
-DateTime,Symbol,Amount,Price,Position,TP/SL,PNL$
- at  -- ,DEFI/USDT:USDT,0.037,583.7,OpenLong[BUY],['666.8']/0.0,None
+EntryTime,ExitTime,Symbol,TF,Position,Amount,EntryPrice,ClosePrice,TP,SL,PNL$
