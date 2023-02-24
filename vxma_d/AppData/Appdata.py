@@ -411,15 +411,23 @@ def edit_trade_record(
                 order_history["ClosePrice"][id] = price
 
             if order_history["Position"][id] == "Long":
-                order_history["PNL$"][id] = (
-                    order_history["ClosePrice"][id]
-                    - order_history["EntryPrice"][id]
-                ) * order_history["Amount"][id]
+                order_history["PNL$"][id] = round(
+                    (
+                        order_history["ClosePrice"][id]
+                        - order_history["EntryPrice"][id]
+                    )
+                    * order_history["Amount"][id],
+                    3,
+                )
             else:
-                order_history["PNL$"][id] = (
-                    order_history["EntryPrice"][id]
-                    - order_history["ClosePrice"][id]
-                ) * order_history["Amount"][id]
+                order_history["PNL$"][id] = round(
+                    (
+                        order_history["EntryPrice"][id]
+                        - order_history["ClosePrice"][id]
+                    )
+                    * order_history["Amount"][id],
+                    3,
+                )
     # rewrite the whole dataframe to the CSV file
     order_history.to_csv("trades.csv", index=False, header=True)
 
@@ -446,14 +454,22 @@ def edit_all_trade_record(
                 order_history["ClosePrice"][id] = price
 
             if order_history["Position"][id] == "Long":
-                order_history["PNL$"][id] = (
-                    order_history["ClosePrice"][id]
-                    - order_history["EntryPrice"][id]
-                ) * order_history["Amount"][id]
+                order_history["PNL$"][id] = round(
+                    (
+                        order_history["ClosePrice"][id]
+                        - order_history["EntryPrice"][id]
+                    )
+                    * order_history["Amount"][id],
+                    3,
+                )
             else:
-                order_history["PNL$"][id] = (
-                    order_history["EntryPrice"][id]
-                    - order_history["ClosePrice"][id]
-                ) * order_history["Amount"][id]
+                order_history["PNL$"][id] = round(
+                    (
+                        order_history["EntryPrice"][id]
+                        - order_history["ClosePrice"][id]
+                    )
+                    * order_history["Amount"][id],
+                    3,
+                )
     # rewrite the whole dataframe to the CSV file
     order_history.to_csv("trades.csv", index=False, header=True)

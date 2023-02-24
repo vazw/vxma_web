@@ -1,6 +1,5 @@
 import asyncio  # pyright: ignore # noqa:
 from datetime import datetime
-from time import ctime, time
 import ccxt.async_support as ccxt
 import pandas as pd
 
@@ -439,7 +438,7 @@ async def USESLLONG(symbol, exchange: ccxt.binance, amount, low, side):
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         notify_send(
-            f"เกิดเตุการณืไม่คาดฝัน Order SL ทำรายการไม่สำเร็จ\n{lastUpdate.status}\n{e}"
+            f"เกิดเตุการณืไม่คาดฝัน OrderSL ทำรายการไม่สำเร็จ\n{lastUpdate.status}\n{e}"
         )
         return 0.0
 
@@ -490,7 +489,7 @@ async def USETPLONG(
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         notify_send(
-            f"เกิดเตุการณืไม่คาดฝัน Order TP  ทำรายการไม่สำเร็จ\n{lastUpdate.status}\n{e}"
+            f"เกิดเตุการณืไม่คาดฝัน OrderTP ทำรายการไม่สำเร็จ\n{lastUpdate.status}\n{e}"
         )
         return None
 
@@ -998,14 +997,8 @@ async def get_currentmode():
         currentMode.Lside = "LONG"
 
 
-async def feed(
-    df,
-    risk_manage,
-    balance,
-    min_balance,
-    status,
-):
-    posim = risk_manage["symbol"][:-5].replace("/", "")
+async def check_current_position(symbol: str, status: pd.DataFrame):
+    posim = symbol[:-5].replace("/", "")
     if status is None:
         return
     status = status[status["symbol"] == posim]
@@ -1070,6 +1063,92 @@ async def feed(
 
     is_in_Long = True if amt_long != 0 else False
     is_in_Short = True if amt_short != 0 else False
+    del status
+    return {
+        "long": {
+            "amount": amt_long,
+            "pnl": upnl_long,
+            "position": is_in_Long,
+        },
+        "short": {
+            "amount": amt_short,
+            "pnl": upnl_short,
+            "position": is_in_Short,
+        },
+    }
+
+
+async def check_if_closed_position(
+    df: pd.DataFrame,
+    symbol: str,
+    timeframe: str,
+    status: pd.DataFrame,
+    direction: str = "",
+) -> None:
+    """
+    check if open position still exits
+    """
+    saved_position = read_one_open_trade_record(symbol, timeframe, direction)
+    if saved_position is None:
+        del status
+        return
+    posim = symbol[:-5].replace("/", "")
+    last = len(df.index) - 1
+    if df["isSL"][last] == 1 and saved_position is not None:
+        notify_send(f"{symbol} got Stop-Loss!")
+        time_now = lastUpdate.candle
+        edit_trade_record(
+            time_now,
+            symbol,
+            timeframe,
+            direction,
+            0.0,
+            isSl=True,
+        )
+        candle(df, symbol, f"{timeframe} {time_now}")
+        del status
+        return
+
+    ex_position = [f"{symbol}" for symbol in status["symbol"]]
+    if posim not in ex_position and saved_position is not None:
+        exchange = await connect()
+        closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
+        await disconnect(exchange)
+        notify_send(
+            f"{symbol} {timeframe} {direction} Being Closed! "
+            + f"at {closed_pnl[0]['price']}"
+        )
+        edit_trade_record(
+            lastUpdate.candle,
+            symbol,
+            timeframe,
+            direction,
+            closed_pnl[0]["price"],
+        )
+        del status
+        return
+
+
+async def feed(
+    df,
+    risk_manage,
+    balance,
+    min_balance,
+    status,
+):
+
+    last = len(df.index) - 1
+
+    current_position, closed = await asyncio.gather(
+        check_current_position(risk_manage, status.copy()),
+        check_if_closed_position(
+            df,
+            risk_manage["symbol"],
+            risk_manage["timeframe"],
+            status.copy(),
+            "Long" if df["trend"][last - 1] == 1 else "Short",
+        ),
+    )
 
     long_record = read_one_open_trade_record(
         risk_manage["symbol"], risk_manage["timeframe"], "Long"
@@ -1078,34 +1157,16 @@ async def feed(
         risk_manage["symbol"], risk_manage["timeframe"], "Short"
     )
 
-    last = len(df.index) - 1
-    if df["isSL"][last] == 1 and (
-        long_record is not None or short_record is not None
-    ):
-        notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
-        time_now = lastUpdate.candle
-        edit_trade_record(
-            time_now,
-            risk_manage["symbol"],
-            risk_manage["timeframe"],
-            "Long" if df["trend"][last] == 0 else "Short",
-            0.0,
-            isSl=True,
-        )
-        candle(
-            df, risk_manage["symbol"], f"{risk_manage['timeframe']} {time_now}"
-        )
-
     if df["BUY"][last] == 1 and long_record is None:
         lastUpdate.status = "changed to Bullish, buy"
-        if is_in_Short:
+        if current_position["short"]["position"]:
             lastUpdate.status = "closeshort"
             await CloseShort(
                 df,
                 balance,
                 risk_manage["symbol"],
-                amt_short,
-                upnl_short,
+                current_position["short"]["amount"],
+                current_position["short"]["pnl"],
                 currentMode.Sside,
                 risk_manage["timeframe"],
                 closeall=True,
@@ -1140,14 +1201,14 @@ async def feed(
 
     if df["SELL"][last] == 1 and short_record is None:
         lastUpdate.status = "changed to Bearish, Sell"
-        if is_in_Long:
+        if current_position["long"]["position"]:
             lastUpdate.status = "closelong"
             await CloseLong(
                 df,
                 balance,
                 risk_manage["symbol"],
-                amt_long,
-                upnl_long,
+                current_position["long"]["amount"],
+                current_position["long"]["pnl"],
                 currentMode.Lside,
                 risk_manage["timeframe"],
                 closeall=True,
@@ -1186,73 +1247,21 @@ async def feed_hedge(
     risk_manage,
     balance,
     min_balance,
-    status,
+    status: pd.DataFrame,
 ):
-    posim = risk_manage["symbol"][:-5].replace("/", "")
-    if status is None:
-        return
-    status = status[status["symbol"] == posim]
 
-    if status.empty:
-        amt_short = 0.0
-        amt_long = 0.0
-        upnl_short = 0.0
-        upnl_long = 0.0
-    elif len(status.index) > 1:
-        amt_long = float(
-            (
-                status["positionAmt"][i]
-                for i in status.index
-                if status["symbol"][i] == posim
-                and status["positionSide"][i] == "LONG"
-            ).__next__()
-        )
-        amt_short = float(
-            (
-                status["positionAmt"][i]
-                for i in status.index
-                if status["symbol"][i] == posim
-                and status["positionSide"][i] == "SHORT"
-            ).__next__()
-        )
-        upnl_long = float(
-            (
-                status["unrealizedProfit"][i]
-                for i in status.index
-                if status["symbol"][i] == posim
-                and status["positionSide"][i] == "LONG"
-            ).__next__()
-        )
-        upnl_short = float(
-            (
-                status["unrealizedProfit"][i]
-                for i in status.index
-                if status["symbol"][i] == posim
-                and status["positionSide"][i] == "SHORT"
-            ).__next__()
-        )
-    else:
-        amt = float(
-            (
-                status["positionAmt"][i]
-                for i in status.index
-                if status["symbol"][i] == posim
-            ).__next__()
-        )
-        amt_long = amt if amt > 0 else 0.0
-        amt_short = amt if amt < 0 else 0.0
-        upnl = float(
-            (
-                status["unrealizedProfit"][i]
-                for i in status.index
-                if status["symbol"][i] == posim
-            ).__next__()
-        )
-        upnl_long = upnl if amt != 0 else 0.0
-        upnl_short = upnl if amt != 0 else 0.0
+    last = len(df.index) - 1
 
-    is_in_Long = True if amt_long != 0 else False
-    is_in_Short = True if amt_short != 0 else False
+    current_position, closed = await asyncio.gather(
+        check_current_position(risk_manage, status.copy()),
+        check_if_closed_position(
+            df,
+            risk_manage["symbol"],
+            risk_manage["hedge_timeframe"],
+            status.copy(),
+            "Long" if df["trend"][last - 1] == 1 else "Short",
+        ),
+    )
 
     long_record = read_one_open_trade_record(
         risk_manage["symbol"], risk_manage["hedge_timeframe"], "Long"
@@ -1261,33 +1270,14 @@ async def feed_hedge(
         risk_manage["symbol"], risk_manage["hedge_timeframe"], "Short"
     )
 
-    last = len(df.index) - 1
     last_b = len(df_trend.index) - 1
-    if df["isSL"][last] == 1 and (
-        long_record is not None or short_record is not None
-    ):
-        notify_send(f"{risk_manage['symbol']} got Stop-Loss!")
-        time_now = lastUpdate.candle
-        edit_trade_record(
-            time_now,
-            risk_manage["symbol"],
-            risk_manage["hedge_timeframe"],
-            "Long" if df["trend"][last - 1] == 1 else "Short",
-            0.0,
-            isSl=True,
-        )
-        candle(
-            df,
-            risk_manage["symbol"],
-            f"{risk_manage['hedge_timeframe']} {time_now}",
-        )
 
     # Open Long if ther higher trend are bullish
     # but got bearish signal on lower timeframe
     if (
         df["BUY"][last] == 1
         and df_trend["trend"][last_b] == 0
-        and is_in_Short
+        and current_position["short"]["position"]
         and long_record is None
     ):
         print("hedging changed to Bullish, buy")
@@ -1310,7 +1300,7 @@ async def feed_hedge(
     if (
         df["BUY"][last] == 1
         and df_trend["trend"][last_b] == 1
-        and is_in_Short
+        and current_position["short"]["position"]
         and short_record is not None
     ):
         print("hedging changed to Bullish, closeshort buy")
@@ -1318,8 +1308,8 @@ async def feed_hedge(
             df,
             balance,
             risk_manage["symbol"],
-            amt_short,
-            upnl_short,
+            current_position["short"]["amount"],
+            current_position["short"]["pnl"],
             currentMode.Sside,
             risk_manage["hedge_timeframe"],
         )
@@ -1330,7 +1320,7 @@ async def feed_hedge(
     if (
         df["SELL"][last] == 1
         and df_trend["trend"][last_b] == 1
-        and is_in_Long
+        and current_position["long"]["position"]
         and short_record is None
     ):
         print("hedging changed to Bearish, Sell")
@@ -1353,7 +1343,7 @@ async def feed_hedge(
     if (
         df["SELL"][last] == 1
         and df_trend["trend"][last_b] == 0
-        and is_in_Long
+        and current_position["long"]["position"]
         and long_record is not None
     ):
         print("hedging changed to Bearish, Sell")
@@ -1361,8 +1351,8 @@ async def feed_hedge(
             df,
             balance,
             risk_manage["symbol"],
-            amt_long,
-            upnl_long,
+            current_position["long"]["amount"],
+            current_position["long"]["pnl"],
             currentMode.Lside,
             risk_manage["hedge_timeframe"],
         )
