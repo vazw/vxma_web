@@ -15,6 +15,7 @@ from vxma_d.AppData.Appdata import (
     candle,
     notify_send,
     write_trade_record,
+    write_tp_record,
     edit_trade_record,
     edit_all_trade_record,
     read_one_open_trade_record,
@@ -188,11 +189,11 @@ async def fetching_candle_ohlc(symbol, timeframe, limits):
         return bars
 
 
-async def fetchbars(symbol, timeframe):
+async def fetchbars(symbol, timeframe) -> None:
     """
-    get candle from exchange
+    get candle from exchange and update them to ram
     """
-    if f"{symbol}{timeframe}" not in candle_ohlc.keys():
+    if f"{symbol}_{timeframe}" not in candle_ohlc.keys():
         bars = await fetching_candle_ohlc(symbol, timeframe, barsC)
         df = pd.DataFrame(
             bars[:-1],
@@ -206,8 +207,7 @@ async def fetchbars(symbol, timeframe):
             df["timestamp"], unit="ms", utc=True
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
         df = df.set_index("timestamp")
-        candle_ohlc.update({f"{symbol}{timeframe}": df})
-        return candle_ohlc[f"{symbol}{timeframe}"].copy()
+        candle_ohlc.update({f"{symbol}_{timeframe}": df})
     else:
         bars = await fetching_candle_ohlc(symbol, timeframe, 5)
         df = pd.DataFrame(
@@ -223,12 +223,11 @@ async def fetchbars(symbol, timeframe):
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
         df = df.set_index("timestamp")
         df = pd.concat(
-            [candle_ohlc[f"{symbol}{timeframe}"], df], ignore_index=False
+            [candle_ohlc[f"{symbol}_{timeframe}"], df], ignore_index=False
         )
-        candle_ohlc[f"{symbol}{timeframe}"] = df[
+        candle_ohlc[f"{symbol}_{timeframe}"] = df[
             ~df.index.duplicated(keep="last")
         ].tail(barsC)
-        return candle_ohlc[f"{symbol}{timeframe}"].copy()
 
 
 # set leverage pass
@@ -997,7 +996,7 @@ async def get_currentmode():
         currentMode.Lside = "LONG"
 
 
-async def check_current_position(symbol: str, status: pd.DataFrame):
+async def check_current_position(symbol: str, status: pd.DataFrame) -> dict:
     posim = symbol[:-5].replace("/", "")
     if status is None:
         return
@@ -1109,7 +1108,12 @@ async def check_if_closed_position(
         del status
         return
 
-    ex_position = [f"{symbol}" for symbol in status["symbol"]]
+    ex_position = [
+        f"{status['symbol'][i]}"
+        for i in status.index
+        if status["symbol"][i] == posim
+        and status["positionSide"][i] == direction.upper()
+    ]
     if posim not in ex_position and saved_position is not None:
         exchange = await connect()
         closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
@@ -1127,6 +1131,34 @@ async def check_if_closed_position(
         )
         del status
         return
+    ex_amount = float(
+        (
+            status["positionAmt"][i]
+            for i in status.index
+            if status["symbol"][i] == posim
+            and status["positionSide"][i] == direction.upper()
+        ).__next__()
+    )
+    saved_amount = float(saved_position["Amount"])
+    if saved_amount != abs(ex_amount):
+        exchange = await connect()
+        closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
+        await disconnect(exchange)
+        notify_send(
+            f"{symbol} {timeframe} {direction} Being TP!! "
+            + f"at {closed_pnl[0]['price']}"
+        )
+        write_tp_record(
+            lastUpdate.candle,
+            symbol,
+            timeframe,
+            direction,
+            closed_pnl[0]["price"],
+            saved_amount - abs(ex_amount),
+            saved_position,
+        )
+        del status
+        return
 
 
 async def feed(
@@ -1140,7 +1172,7 @@ async def feed(
     last = len(df.index) - 1
 
     current_position, closed = await asyncio.gather(
-        check_current_position(risk_manage, status.copy()),
+        check_current_position(risk_manage["symbol"], status.copy()),
         check_if_closed_position(
             df,
             risk_manage["symbol"],
@@ -1253,7 +1285,7 @@ async def feed_hedge(
     last = len(df.index) - 1
 
     current_position, closed = await asyncio.gather(
-        check_current_position(risk_manage, status.copy()),
+        check_current_position(risk_manage["symbol"], status.copy()),
         check_if_closed_position(
             df,
             risk_manage["symbol"],

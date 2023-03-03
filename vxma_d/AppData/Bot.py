@@ -3,7 +3,6 @@ import time
 from uuid import uuid4
 import warnings
 from tabulate import tabulate
-from datetime import datetime
 
 import pandas as pd
 
@@ -122,9 +121,24 @@ common_names = {
 }
 
 
+async def update_candle() -> None:
+    try:
+        update_tasks = [
+            asyncio.create_task(fetchbars(symbol, tf))
+            for symbol, tf in [str(i).split("_") for i in candle_ohlc.keys()]
+        ]
+        if len(update_tasks) > 0:
+            await asyncio.gather(*update_tasks)
+    except Exception as e:
+        lastUpdate.status = f"{e}"
+        print(f"update candle error : {e}")
+
+
 async def bot_1(symbol, ta_data, tf):
     try:
-        data1 = await fetchbars(symbol, tf)
+        if f"{symbol}_{tf}" not in candle_ohlc.keys():
+            await fetchbars(symbol, tf)
+        data1 = candle_ohlc[f"{symbol}_{tf}"].copy()
         bot1 = ta(data1, ta_data)
         data1 = bot1.indicator()
         return data1
@@ -135,7 +149,9 @@ async def bot_1(symbol, ta_data, tf):
 
 async def bot_2(symbol, ta_data, tf):
     try:
-        data2 = await fetchbars(symbol, tf)
+        if f"{symbol}_{tf}" not in candle_ohlc.keys():
+            await fetchbars(symbol, tf)
+        data2 = candle_ohlc[f"{symbol}_{tf}"].copy()
         bot2 = ta(data2, ta_data)
         data2 = bot2.indicator()
         return data2
@@ -146,7 +162,9 @@ async def bot_2(symbol, ta_data, tf):
 
 async def bot_3(symbol, ta_data, tf):
     try:
-        data3 = await fetchbars(symbol, tf)
+        if f"{symbol}_{tf}" not in candle_ohlc.keys():
+            await fetchbars(symbol, tf)
+        data3 = candle_ohlc[f"{symbol}_{tf}"].copy()
         bot3 = ta(data3, ta_data)
         data3 = bot3.indicator()
         return data3
@@ -238,7 +256,7 @@ def remove_last_line_from_string(text):
     return text[: text.rfind("\n")]
 
 
-def write_daily_balance():
+async def write_daily_balance():
     fiat_balance = account_balance.fiat_balance
     total_balance = (
         fiat_balance["BUSD"]["total"] + fiat_balance["USDT"]["total"]
@@ -257,7 +275,6 @@ def write_daily_balance():
 
 
 async def hourly_report():
-    await account_balance.update_balance()
     balance = account_balance.balance
     lastUpdate.status = "Hourly report"
     positions = balance["info"]["positions"]
@@ -287,12 +304,10 @@ async def hourly_report():
         + f"\nNet Profit/Loss  : {round(netunpl,2)}$"
     )
     notify_send(msg)
-    insession["hour"] = True
 
 
 async def dailyreport():
     lastUpdate.status = "Daily Report"
-    candle_ohlc.clear()
     try:
         notify_send(
             "คู่เทรดที่น่าสนใจในวันนี้\n",
@@ -336,7 +351,6 @@ async def dailyreport():
             sticker=1995,
             package=446,
         )
-        candle_ohlc.clear()
         return
     except Exception as e:
         notify_send(f"เกิดความผิดพลาดในส่วนของแจ้งเตือนรายวัน {e}")
@@ -344,106 +358,100 @@ async def dailyreport():
         return
 
 
-async def running_module():
-    lastUpdate.status = "Loading..."
-    symbolist = bot_setting()
-    await account_balance.update_balance()
+async def main_bot(symbolist: pd.Series):
+    try:
+        ta_table_data = TATable(
+            atr_p=symbolist["ATR"],
+            atr_m=symbolist["ATR_m"],
+            ema=symbolist["EMA"],
+            linear=symbolist["subhag"],
+            smooth=symbolist["smooth"],
+            rsi=symbolist["RSI"],
+            aol=symbolist["Andean"],
+            pivot=symbolist["Pivot"],
+        )
 
-    for i in symbolist.index:
-        try:
-            ta_table_data = TATable(
-                atr_p=symbolist["ATR"][i],
-                atr_m=symbolist["ATR_m"][i],
-                ema=symbolist["EMA"][i],
-                linear=symbolist["subhag"][i],
-                smooth=symbolist["smooth"][i],
-                rsi=symbolist["RSI"][i],
-                aol=symbolist["Andean"][i],
-                pivot=symbolist["Pivot"][i],
-            )
+        balance = account_balance.balance
+        risk_manage_data = RiskManageTable(symbolist, balance)
+        lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
 
-            balance = account_balance.balance
-            risk_manage_data = RiskManageTable(symbolist, i, balance)
-            lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
-
-            if risk_manage_data.usehedge:
-                data, df_hedge = await asyncio.gather(
-                    bot_1(
-                        risk_manage_data.symbol,
-                        ta_table_data.__dict__,
-                        risk_manage_data.timeframe,
-                    ),
-                    bot_2(
-                        risk_manage_data.symbol,
-                        ta_table_data.__dict__,
-                        risk_manage_data.hedge_timeframe,
-                    ),
-                )
-            else:
-                data = await bot_1(
+        if risk_manage_data.usehedge:
+            data, df_hedge = await asyncio.gather(
+                bot_1(
                     risk_manage_data.symbol,
                     ta_table_data.__dict__,
                     risk_manage_data.timeframe,
-                )
-                df_hedge = None
+                ),
+                bot_2(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.hedge_timeframe,
+                ),
+            )
+        else:
+            data = await bot_1(
+                risk_manage_data.symbol,
+                ta_table_data.__dict__,
+                risk_manage_data.timeframe,
+            )
+            df_hedge = None
 
-            positions = balance["info"]["positions"]
-            status = pd.DataFrame(
-                [
-                    position
-                    for position in positions
-                    if float(position["positionAmt"]) != 0
-                ],
-                columns=statcln,
+        positions = balance["info"]["positions"]
+        status = pd.DataFrame(
+            [
+                position
+                for position in positions
+                if float(position["positionAmt"]) != 0
+            ],
+            columns=statcln,
+        )
+
+        margin = 0.0
+        config = AppConfig()
+        max_margin = config.max_margin
+        min_balance = config.min_balance
+        margin = float((status["initialMargin"]).astype("float64").sum())
+
+        if margin > max_margin:
+            notify_send(
+                f"Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
+                f"ที่กำหนดไว้ : {max_margin}",
+                sticker=17857,
+                package=1070,
             )
 
-            margin = 0.0
-            config = AppConfig()
-            max_margin = config.max_margin
-            min_balance = config.min_balance
-            margin = float((status["initialMargin"]).astype("float64").sum())
-
-            if margin > max_margin:
-                notify_send(
-                    f"Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
-                    f"ที่กำหนดไว้ : {max_margin}",
-                    sticker=17857,
-                    package=1070,
+        if df_hedge is not None:
+            await asyncio.gather(
+                feed(
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    min_balance,
+                    status,
+                ),
+                feed_hedge(
+                    df_hedge,
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    min_balance,
+                    status,
+                ),
+            )
+        else:
+            await asyncio.gather(
+                feed(
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    min_balance,
+                    status,
                 )
-                pass
+            )
 
-            if df_hedge is not None:
-                await asyncio.gather(
-                    feed(
-                        data,
-                        risk_manage_data.__dict__,
-                        balance,
-                        min_balance,
-                        status,
-                    ),
-                    feed_hedge(
-                        df_hedge,
-                        data,
-                        risk_manage_data.__dict__,
-                        balance,
-                        min_balance,
-                        status,
-                    ),
-                )
-            else:
-                await asyncio.gather(
-                    feed(
-                        data,
-                        risk_manage_data.__dict__,
-                        balance,
-                        min_balance,
-                        status,
-                    )
-                )
-
-        except Exception as e:
-            lastUpdate.status = f"{e}"
-            continue
+    except Exception as e:
+        lastUpdate.status = f"{e}"
+        print(f"{risk_manage_data.symbol} got error {e}")
 
 
 async def waiting():
@@ -541,20 +549,42 @@ async def warper_fn():
                 insession["day"] = False
                 insession["hour"] = False
 
+            """create async tasks from each bot settings then run it asynconously
+            (Do all at the same time)"""
+            lastUpdate.status = "Creating Tasks"
+
+            tasks = [
+                asyncio.create_task(
+                    main_bot(
+                        symbolist.iloc[
+                            i,
+                        ]
+                    )
+                )
+                for i in symbolist.index
+            ]
+
+            sub_tasks = []
+
             if str(local_time[11:-9]) == "07:0" and not insession["day"]:
                 insession["day"] = True
                 insession["hour"] = True
-                await asyncio.gather(dailyreport())
-                await hourly_report()
-                write_daily_balance()
+                sub_tasks.append(asyncio.create_task(dailyreport()))
+                sub_tasks.append(asyncio.create_task(hourly_report()))
+                sub_tasks.append(asyncio.create_task(write_daily_balance()))
 
             if str(local_time[14:-9]) == "0" and not insession["hour"]:
-                await hourly_report()
-                await waiting()
+                insession["hour"] = True
+                sub_tasks.append(asyncio.create_task(hourly_report()))
+                sub_tasks.append(asyncio.create_task(waiting()))
 
             if time.time() >= timer.next_candle:
                 lastUpdate.candle = time.ctime(time.time())
-                await running_module()
+                await account_balance.update_balance()
+                await update_candle()
+                await asyncio.gather(*tasks)
+                if len(sub_tasks) > 0:
+                    await asyncio.gather(*sub_tasks)
                 timer.next_candle += timer.min_timewait
             else:
                 await asyncio.sleep(timer.next_candle - time.time())
@@ -564,7 +594,7 @@ async def warper_fn():
             print(e)
             notify_send(f"เกิดข้อผิดพลาดภายนอก\n{e}\nRestarting Bot...")
             lastUpdate.status = "Sleep Mode"
-            await asyncio.sleep(60)
+            await asyncio.sleep(10)
             tasks = asyncio.current_task()
             clearconsol()
             tasks.cancel()

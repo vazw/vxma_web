@@ -140,30 +140,30 @@ def max_margin_size(size, free_balance) -> float:
 
 
 class RiskManageTable:
-    def __init__(self, symbolist, col_index, balance):
-        self.symbol = symbolist["symbol"][col_index]
+    def __init__(self, symbolist, balance):
+        self.symbol = symbolist["symbol"]
         self.quote = "BUSD" if self.symbol.endswith("BUSD") else "USDT"
         # if self.symbol[0:4] == "1000":
         #     self.symbol = self.symbol[4 : len(self.symbol)]
-        self.timeframe = symbolist["timeframe"][col_index]
-        self.use_long = self.check_bool(symbolist["Uselong"][col_index])
-        self.use_short = self.check_bool(symbolist["Useshort"][col_index])
-        self.use_tp_1 = self.check_bool(symbolist["UseTP"][col_index])
-        self.use_tp_2 = self.check_bool(symbolist["UseTP2"][col_index])
-        self.use_sl = self.check_bool(symbolist["UseSL"][col_index])
-        self.use_tailing = self.check_bool(symbolist["Tail_SL"][col_index])
+        self.timeframe = symbolist["timeframe"]
+        self.use_long = self.check_bool(symbolist["Uselong"])
+        self.use_short = self.check_bool(symbolist["Useshort"])
+        self.use_tp_1 = self.check_bool(symbolist["UseTP"])
+        self.use_tp_2 = self.check_bool(symbolist["UseTP2"])
+        self.use_sl = self.check_bool(symbolist["UseSL"])
+        self.use_tailing = self.check_bool(symbolist["Tail_SL"])
         self.free_balance = float(balance["free"][self.quote])
         self.max_size = max_margin_size(
-            str(symbolist["maxMargin"][col_index]), self.free_balance
+            str(symbolist["maxMargin"]), self.free_balance
         )
-        self.risk_size = str(symbolist["Risk"][col_index])
-        self.tp_percent = symbolist["TP1"][col_index]
-        self.tp_percent_2 = symbolist["TP2"][col_index]
-        self.risk_reward_1 = symbolist["RR1"][col_index]
-        self.risk_reward_2 = symbolist["RR2"][col_index]
-        self.leverage = symbolist["leverage"][col_index]
-        self.usehedge = self.check_bool(symbolist["hedge"][col_index])
-        self.hedge_timeframe = symbolist["hedgeTF"][col_index]
+        self.risk_size = str(symbolist["Risk"])
+        self.tp_percent = symbolist["TP1"]
+        self.tp_percent_2 = symbolist["TP2"]
+        self.risk_reward_1 = symbolist["RR1"]
+        self.risk_reward_2 = symbolist["RR2"]
+        self.leverage = symbolist["leverage"]
+        self.usehedge = self.check_bool(symbolist["hedge"])
+        self.hedge_timeframe = symbolist["hedgeTF"]
 
     def check_bool(self, arg) -> bool:
         return True if str(arg).lower() == "true" else False
@@ -338,7 +338,7 @@ def read_one_open_trade_record(
     symbol: str,
     timeframe: str,
     direction: str = "",
-):
+) -> pd.Series:
     order_history = pd.read_csv("trades.csv")
     position = None
     for id in order_history.index:
@@ -364,7 +364,7 @@ def write_trade_record(
     direction: str,
     tp: any = None,
     sl: float = None,
-):
+) -> None:
     # Create a dataframe from the input data
     df = pd.DataFrame(
         {
@@ -387,6 +387,71 @@ def write_trade_record(
     df.to_csv("trades.csv", mode="a", index=False, header=False)
 
 
+def write_tp_record(
+    timestamp: datetime,
+    symbol: str,
+    timeframe: str,
+    direction: str,
+    price: float,
+    amount: float,
+    saved_position: pd.Series,
+) -> None:
+    # Create a dataframe from the input data
+    order_history = pd.read_csv("trades.csv")
+    for id in order_history.index:
+        if (
+            order_history["Symbol"][id] == symbol
+            and pd.isnull(order_history["ClosePrice"][id])
+            and order_history["Position"][id] == direction
+            and order_history["TF"][id] == timeframe
+        ):
+
+            order_history["ExitTime"][id] = timestamp
+            order_history["ClosePrice"][id] = price
+            order_history["Amount"][id] = amount
+
+            if order_history["Position"][id] == "Long":
+                order_history["PNL$"][id] = round(
+                    (
+                        order_history["ClosePrice"][id]
+                        - order_history["EntryPrice"][id]
+                    )
+                    * order_history["Amount"][id],
+                    3,
+                )
+            else:
+                order_history["PNL$"][id] = round(
+                    (
+                        order_history["EntryPrice"][id]
+                        - order_history["ClosePrice"][id]
+                    )
+                    * order_history["Amount"][id],
+                    3,
+                )
+    # rewrite the whole dataframe to the CSV file
+    order_history.to_csv("trades.csv", index=False, header=True)
+
+    df = pd.DataFrame(
+        {
+            "EntryTime": [saved_position["EntryTime"]],
+            "ExitTime": [None],
+            "Symbol": [symbol],
+            "TF": [timeframe],
+            "Position": [direction],
+            "Amount": [float(saved_position["Amount"]) - amount],
+            "EntryPrice": [price],
+            "ClosePrice": [None],
+            "TP": [saved_position["TP"]],
+            "SL": [saved_position["SL"]],
+            "PNL$": [None],
+        }
+    )
+
+    # Append the dataframe to the CSV file
+    # df.to_csv("trades.csv", index=False, header=True)
+    df.to_csv("trades.csv", mode="a", index=False, header=False)
+
+
 def edit_trade_record(
     timestamp: datetime,
     symbol: str,
@@ -394,7 +459,7 @@ def edit_trade_record(
     direction: str,
     price: float,
     isSl: bool = False,
-):
+) -> None:
     # Create a dataframe from the input data
     order_history = pd.read_csv("trades.csv")
     for id in order_history.index:
@@ -438,7 +503,7 @@ def edit_all_trade_record(
     direction: str,
     price: float,
     isSl: bool = False,
-):
+) -> None:
     # Create a dataframe from the input data
     order_history = pd.read_csv("trades.csv")
     for id in order_history.index:
