@@ -62,6 +62,11 @@ password = 'vxmaBot'
 │   ├── Update Balance faster
 │   ├── Fixed bug 
 │   ├── Add OrderClientId for future-use 
+├─ 0.1.5  
+│   ├── Add async tasks for each bot settings
+│   ├── 200% faster
+│   ├── Update Trading Record Mechanic
+│   ├── Logging Balance for portfolio tracker
 ```
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)

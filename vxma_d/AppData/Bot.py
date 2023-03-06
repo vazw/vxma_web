@@ -566,23 +566,25 @@ async def warper_fn():
 
             sub_tasks = []
 
-            if str(local_time[11:-9]) == "07:0" and not insession["day"]:
-                insession["day"] = True
-                insession["hour"] = True
-                sub_tasks.append(asyncio.create_task(dailyreport()))
-                sub_tasks.append(asyncio.create_task(hourly_report()))
-                sub_tasks.append(asyncio.create_task(write_daily_balance()))
-
-            if str(local_time[14:-9]) == "0" and not insession["hour"]:
-                insession["hour"] = True
-                sub_tasks.append(asyncio.create_task(hourly_report()))
-                sub_tasks.append(asyncio.create_task(waiting()))
-
             if time.time() >= timer.next_candle:
                 lastUpdate.candle = time.ctime(time.time())
                 await account_balance.update_balance()
                 await update_candle()
                 await asyncio.gather(*tasks)
+                await asyncio.sleep(0.5)
+                if str(local_time[11:-9]) == "07:0" and not insession["day"]:
+                    insession["day"] = True
+                    insession["hour"] = True
+                    await asyncio.gather(dailyreport())
+                    sub_tasks.append(
+                        asyncio.create_task(write_daily_balance())
+                    )
+                    sub_tasks.append(asyncio.create_task(hourly_report()))
+                    sub_tasks.append(asyncio.create_task(waiting()))
+                if str(local_time[14:-9]) == "0" and not insession["hour"]:
+                    insession["hour"] = True
+                    sub_tasks.append(asyncio.create_task(hourly_report()))
+                    sub_tasks.append(asyncio.create_task(waiting()))
                 if len(sub_tasks) > 0:
                     await asyncio.gather(*sub_tasks)
                 timer.next_candle += timer.min_timewait
