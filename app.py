@@ -27,6 +27,8 @@ def main():
             asyncio.run(Bot.run_bot())
         except KeyboardInterrupt:
             return print(my_message)
+        else:
+            pass
 
 
 if __name__ == "__main__":
