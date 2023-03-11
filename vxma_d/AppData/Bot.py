@@ -3,6 +3,7 @@ import time
 from uuid import uuid4
 import warnings
 from tabulate import tabulate
+from collections import deque
 
 import pandas as pd
 
@@ -29,12 +30,13 @@ from vxma_d.MarketEX.CCXT_Binance import (
     get_symbol,
     account_balance,
     fetchbars,
+    binance_i,
 )
 from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 from vxma_d.Strategy.vxma_talib import vxma as ta
 
 
-bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.4) github.com/vazw/vxma_web"
+bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.5) github.com/vazw/vxma_web"
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -329,8 +331,6 @@ async def dailyreport():
         )
         margin = float((status["initialMargin"]).astype("float64").sum())
         netunpl = float((status["unrealizedProfit"]).astype("float64").sum())
-        print(f"Margin Used : {margin}")
-        print(f"NET unrealizedProfit : {netunpl}")
         status = status.sort_values(by=["unrealizedProfit"], ascending=False)
         status = status.head(1)
         firstline = (status.index)[0]
@@ -358,7 +358,7 @@ async def dailyreport():
         return
 
 
-async def main_bot(symbolist: pd.Series):
+async def main_bot(symbolist: pd.Series) -> None:
     try:
         ta_table_data = TATable(
             atr_p=symbolist["ATR"],
@@ -451,7 +451,7 @@ async def main_bot(symbolist: pd.Series):
 
     except Exception as e:
         lastUpdate.status = f"{e}"
-        print(f"{risk_manage_data.symbol} got error {e}")
+        print(f"{risk_manage_data.symbol} got error :{e}")
 
 
 async def waiting():
@@ -524,6 +524,22 @@ async def get_waiting_time():
         return await get_waiting_time()
 
 
+async def split_list(input_list, chunk_size):
+    # Create a deque object from the input list
+    deque_obj = deque(input_list)
+    # While the deque object is not empty
+    while deque_obj:
+        # Pop chunk_size elements from the left side of the deque object
+        # and append them to the chunk list
+        chunk = []
+        for _ in range(chunk_size):
+            if deque_obj:
+                chunk.append(deque_obj.popleft())
+
+        # Yield the chunk
+        yield chunk
+
+
 async def warper_fn():
     while True:
         try:
@@ -568,14 +584,16 @@ async def warper_fn():
 
             if time.time() >= timer.next_candle:
                 lastUpdate.candle = time.ctime(time.time())
+                await binance_i.get_exchange()
                 await account_balance.update_balance()
                 await update_candle()
-                await asyncio.gather(*tasks)
+                async for task in split_list(tasks, 5):
+                    await asyncio.gather(*task)
                 await asyncio.sleep(0.5)
                 if str(local_time[11:-9]) == "07:0" and not insession["day"]:
                     insession["day"] = True
                     insession["hour"] = True
-                    await asyncio.gather(dailyreport())
+                    # await asyncio.wait_for(dailyreport())
                     sub_tasks.append(
                         asyncio.create_task(write_daily_balance())
                     )
@@ -589,6 +607,7 @@ async def warper_fn():
                     await asyncio.gather(*sub_tasks)
                 timer.next_candle += timer.min_timewait
             else:
+                await binance_i.disconnect()
                 await asyncio.sleep(timer.next_candle - time.time())
 
         except Exception as e:
@@ -600,7 +619,10 @@ async def warper_fn():
             tasks = asyncio.current_task()
             clearconsol()
             tasks.cancel()
-            raise ConnectionError
+            raise
+
+        finally:
+            await binance_i.disconnect()
 
 
 async def run_bot():

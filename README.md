@@ -67,6 +67,7 @@ password = 'vxmaBot'
 │   ├── 200% faster
 │   ├── Update Trading Record Mechanic
 │   ├── Logging Balance for portfolio tracker
+│   ├── Update to singleton pattern to minimize resoucese
 ```
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)

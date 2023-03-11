@@ -32,20 +32,16 @@ class AccountBalance:
         self.fiat_balance = ""
 
     async def update_balance(self):
-        exchange = await connect()
+        exchange = await binance_i.get_exchange()
         try:
             balance = await exchange.fetch_balance()
-            await disconnect(exchange)
             self.balance = balance
             self.fiat_balance = {
                 x: y for x, y in balance.items() if "USD" in x[-4:]
             }
         except Exception as e:
             lastUpdate.status = f"{e}"
-            await disconnect(exchange)
-            exchange = await connect()
             balance = await exchange.fetch_balance()
-            await disconnect(exchange)
             self.balance = balance
             self.fiat_balance = {
                 x: y for x, y in balance.items() if "USD" in x[-4:]
@@ -99,25 +95,34 @@ def RRTP(df, direction, step, price, TPRR1, TPRR2):
             return price * (1 - ((high - price) / price) * float(TPRR2))
 
 
-async def connect():
-    config = AppConfig()
-    try:
+class Binance:
+    """Binance singleton instance"""
+
+    def __init__(self):
+        self.exchange = None
+
+    async def connect(self) -> None:
+        config = AppConfig()
         exchange = ccxt.binance(config.BNBCZ)
-        return exchange
-    except Exception as e:
-        print(e)
-        return await disconnect(exchange)
+        self.exchange = exchange
+
+    async def connect_loads(self) -> None:
+        await self.exchange.load_markets(reload=True)
+
+    async def get_exchange(self) -> ccxt.binance:
+        if self.exchange is None:
+            await self.connect()
+            return self.exchange
+        else:
+            return self.exchange
+
+    async def disconnect(self) -> None:
+        if self.exchange is not None:
+            await self.exchange.close()
+            self.exchange = None
 
 
-async def connect_loads():
-    config = AppConfig()
-    exchange = ccxt.binance(config.BNBCZ)
-    await exchange.load_markets(reload=True)
-    return exchange
-
-
-async def disconnect(exchange):
-    return await exchange.close()
+binance_i = Binance()
 
 
 async def get_bidask(symbol, exchange, bidask="ask"):
@@ -134,13 +139,12 @@ async def get_symbol():
     """
     symbolist = bot_setting()
     lastUpdate.status = "fecthing Symbol of Top 10 Volume..."
-    exchange = await connect()
+    exchange = await binance_i.get_exchange()
     try:
         market = await exchange.fetch_tickers(params={"type": "future"})
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         market = await exchange.fetch_tickers(params={"type": "future"})
-    await disconnect(exchange)
     symbols = pd.DataFrame([y for x, y in market.items() if "USD" in x[-4:]])
     symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
     symbols = symbols.head(10)
@@ -157,36 +161,27 @@ async def getAllsymbol():
     """
     Get all symbols
     """
-    exchange = await connect()
+    exchange = await binance_i.get_exchange()
     try:
         market = await exchange.fetch_tickers(params={"type": "future"})
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         market = await exchange.fetch_tickers(params={"type": "future"})
-    await disconnect(exchange)
     symbols = pd.DataFrame([y for x, y in market.items() if "USD" in x[-4:]])
     symbols = symbols.sort_values(by=["quoteVolume"], ascending=False)
     return [symbol for symbol in symbols["symbol"]]
 
 
 async def fetching_candle_ohlc(symbol, timeframe, limits):
-    exchange = await connect()
+    exchange = await binance_i.get_exchange()
     try:
         bars = await exchange.fetch_ohlcv(
             symbol, timeframe=timeframe, since=None, limit=limits
         )
-        await disconnect(exchange)
         return bars
     except Exception as e:
-        print(f"{lastUpdate.status}\n{e}")
-        await disconnect(exchange)
-
-        exchange = await connect()
-        bars = await exchange.fetch_ohlcv(
-            symbol, timeframe=timeframe, since=None, limit=limits
-        )
-        await disconnect(exchange)
-        return bars
+        print(f"failed to fetching_candle_ohlc :{lastUpdate.status} {e}")
+        return await fetching_candle_ohlc(symbol, timeframe, limits)
 
 
 async def fetchbars(symbol, timeframe) -> None:
@@ -542,7 +537,8 @@ def sellsize(df, balance, symbol, exchange, RISK, min_amount):
 async def OpenLong(
     df, balance, risk_manage, Lside, min_balance, tf, clearorder: bool = True
 ):
-    exchange = await connect_loads()
+    exchange = await binance_i.get_exchange()
+    await binance_i.connect_loads()
     try:
         if clearorder:
             await exchange.cancel_all_orders(risk_manage["symbol"])
@@ -600,7 +596,7 @@ async def OpenLong(
                 total = float(balance["total"][quote])
             except ccxt.InsufficientFunds as e:
                 notify_send(e)
-                return await disconnect(exchange)
+                return
             if risk_manage["use_tp_1"]:
                 tp12 = await USETPLONG(
                     risk_manage["symbol"],
@@ -663,13 +659,13 @@ async def OpenLong(
             slprice,
         )
         candle(df, risk_manage["symbol"], f"{tf} {time_now}")
-        return await disconnect(exchange)
+        return
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         notify_send(
             f"เกิดความผิดพลาดในการเข้า Order : OpenLong\n{lastUpdate.status}\n{e}"
         )
-        return await disconnect(exchange)
+        return
 
 
 async def USETPSHORT(
@@ -727,7 +723,8 @@ async def USETPSHORT(
 async def OpenShort(
     df, balance, risk_manage, Sside, min_balance, tf, clearorder: bool = True
 ):
-    exchange = await connect_loads()
+    exchange = await binance_i.get_exchange()
+    await binance_i.connect_loads()
     try:
         if clearorder:
             await exchange.cancel_all_orders(risk_manage["symbol"])
@@ -785,7 +782,7 @@ async def OpenShort(
                 total = float(balance["total"][quote])
             except ccxt.InsufficientFunds as e:
                 notify_send(e)
-                return await disconnect(exchange)
+                return
             if risk_manage["use_sl"]:
                 slprice = await USESLSHORT(
                     risk_manage["symbol"],
@@ -848,20 +845,21 @@ async def OpenShort(
             slprice,
         )
         candle(df, risk_manage["symbol"], f"{tf} {time_now}")
-        return await disconnect(exchange)
+        return
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         notify_send(
             f"เกิดความผิดพลาดในการเข้า Order : OpenShort\n{lastUpdate.status}\n{e}"
         )
-        return await disconnect(exchange)
+        return
 
 
 # CloseLong=Sell
 async def CloseLong(
     df, balance, symbol, amt, pnl, Lside, tf, closeall: bool = False
 ):
-    exchange = await connect_loads()
+    exchange = await binance_i.get_exchange()
+    await binance_i.connect_loads()
     try:
         amount = abs(amt)
         upnl = pnl
@@ -880,8 +878,7 @@ async def CloseLong(
             )
         except Exception as e:
             lastUpdate.status = f"{e}"
-            await disconnect(exchange)
-            exchange = await connect_loads()
+            await binance_i.connect_loads()
             order = await exchange.create_market_order(
                 symbol,
                 "sell",
@@ -910,21 +907,22 @@ async def CloseLong(
             edit_trade_record(time_now, symbol, tf, "Long", bid)
 
         candle(df, symbol, f"{tf} {time_now}")
-        return await disconnect(exchange)
+        return
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         notify_send(
             f"เกิดความผิดพลาดในการออก Order : CloseLong\n{lastUpdate.status}\n{e}"
         )
-        return await disconnect(exchange)
+        return
 
 
 # CloseShort=Buy
 async def CloseShort(
     df, balance, symbol, amt, pnl, Sside, tf, closeall: bool = False
 ):
+    exchange = await binance_i.get_exchange()
+    await binance_i.connect_loads()
     try:
-        exchange = await connect_loads()
         amount = abs(amt)
         quote = symbol[-4:]
         orderid = get_order_id()
@@ -942,8 +940,7 @@ async def CloseShort(
             )
         except Exception as e:
             print(f"{lastUpdate.status}\n{e}")
-            await disconnect(exchange)
-            exchange = await connect_loads()
+            await binance_i.connect_loads()
             order = await exchange.create_market_order(
                 symbol,
                 "buy",
@@ -971,25 +968,24 @@ async def CloseShort(
         else:
             edit_trade_record(time_now, symbol, tf, "Short", ask)
         candle(df, symbol, f"{tf} {time_now}")
-        return await disconnect(exchange)
+        return
     except Exception as e:
         print(f"{lastUpdate.status}\n{e}")
         notify_send(
             f"เกิดความผิดพลาดในการออก Order : CloseShort\n{lastUpdate.status}\n{e}"
         )
-        return await disconnect(exchange)
+        return
 
 
 async def get_currentmode():
-    exchange = await connect()
+    exchange = await binance_i.get_exchange()
     try:
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
     except Exception as e:
         lastUpdate.status = f"{e}"
-        await disconnect(exchange)
-        exchange = await connect()
+        await binance_i.connect_loads()
         currentMODE = await exchange.fapiPrivate_get_positionside_dual()
-    await disconnect(exchange)
+    await binance_i.disconnect()
     currentMode.dualSidePosition = currentMODE["dualSidePosition"]
     if currentMode.dualSidePosition:
         currentMode.Sside = "SHORT"
@@ -1115,9 +1111,8 @@ async def check_if_closed_position(
         and status["positionSide"][i] == direction.upper()
     ]
     if posim not in ex_position and saved_position is not None:
-        exchange = await connect()
+        exchange = await binance_i.get_exchange()
         closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
-        await disconnect(exchange)
         notify_send(
             f"{symbol} {timeframe} {direction} Being Closed! "
             + f"at {closed_pnl[0]['price']}"
@@ -1141,9 +1136,8 @@ async def check_if_closed_position(
     )
     saved_amount = float(saved_position["Amount"])
     if saved_amount != abs(ex_amount):
-        exchange = await connect()
+        exchange = await binance_i.get_exchange()
         closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
-        await disconnect(exchange)
         notify_send(
             f"{symbol} {timeframe} {direction} Being TP!! "
             + f"at {closed_pnl[0]['price']}"
