@@ -15,6 +15,7 @@ from vxma_d.AppData import (
 )
 from vxma_d.AppData.Appdata import (
     AppConfig,
+    DefaultRiskTable,
     RiskManageTable,
     TATable,
     bot_setting,
@@ -36,7 +37,7 @@ from vxma_d.Strategy.Benchmarking import benchmarking as ta_score
 from vxma_d.Strategy.vxma_talib import vxma as ta
 
 
-bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.5) github.com/vazw/vxma_web"
+bot_name = "VXMA Trading Bot by Vaz.(Version 0.1.6) github.com/vazw/vxma_web"
 
 launch_uid = uuid4()
 pd.set_option("display.max_rows", None)
@@ -138,38 +139,94 @@ async def update_candle() -> None:
 
 async def bot_1(symbol, ta_data, tf):
     try:
-        if f"{symbol}_{tf}" not in candle_ohlc.keys():
+        if (
+            f"{symbol}_{tf}" not in candle_ohlc.keys()
+            or candle_ohlc[f"{symbol}_{tf}"]["candle"] is None
+        ):
             await fetchbars(symbol, tf)
-        data1 = candle_ohlc[f"{symbol}_{tf}"].copy()
+        data1 = candle_ohlc[f"{symbol}_{tf}"]["candle"].copy()
+        if data1 is None or len(data1.index) < 100:
+            return None
         bot1 = ta(data1, ta_data)
         data1 = bot1.indicator()
         return data1
     except Exception as e:
         lastUpdate.status = f"{e}"
-        pass
+        return bot_1(symbol, ta_data, tf)
 
 
 async def bot_2(symbol, ta_data, tf):
     try:
-        if f"{symbol}_{tf}" not in candle_ohlc.keys():
+        if (
+            f"{symbol}_{tf}" not in candle_ohlc.keys()
+            or candle_ohlc[f"{symbol}_{tf}"]["candle"] is None
+        ):
             await fetchbars(symbol, tf)
-        data2 = candle_ohlc[f"{symbol}_{tf}"].copy()
+        data2 = candle_ohlc[f"{symbol}_{tf}"]["candle"].copy()
+        if data2 is None or len(data2.index) < 100:
+            return None
         bot2 = ta(data2, ta_data)
         data2 = bot2.indicator()
         return data2
     except Exception as e:
         lastUpdate.status = f"{e}"
-        pass
+        return bot_2(symbol, ta_data, tf)
 
 
 async def bot_3(symbol, ta_data, tf):
     try:
-        if f"{symbol}_{tf}" not in candle_ohlc.keys():
+        if (
+            f"{symbol}_{tf}" not in candle_ohlc.keys()
+            or candle_ohlc[f"{symbol}_{tf}"]["candle"] is None
+        ):
             await fetchbars(symbol, tf)
-        data3 = candle_ohlc[f"{symbol}_{tf}"].copy()
+        data3 = candle_ohlc[f"{symbol}_{tf}"]["candle"].copy()
+        if data3 is None or len(data3.index) < 100:
+            return None
         bot3 = ta(data3, ta_data)
         data3 = bot3.indicator()
         return data3
+    except Exception as e:
+        lastUpdate.status = f"{e}"
+        return bot_2(symbol, ta_data, tf)
+
+
+async def scaning_method(symbol: str, ta_data: TATable, symbols: list):
+    try:
+
+        df1, df2, df3 = await asyncio.gather(
+            bot_1(symbol, ta_data.__dict__, "1d"),
+            bot_2(symbol, ta_data.__dict__, "6h"),
+            bot_3(symbol, ta_data.__dict__, "1h"),
+        )
+
+        if df1 is not None:
+            long_term = ta_score(df1)
+            mid_term = ta_score(df2)
+            short_term = ta_score(df3)
+            long_term_score = long_term.benchmarking()
+            mid_term_score = mid_term.benchmarking()
+            short_term_score = short_term.benchmarking()
+            if (
+                (
+                    long_term_score == "Side-Way"
+                    and mid_term_score == "Side-Way"
+                )
+                or (
+                    long_term_score == "Side-Way"
+                    and short_term_score == "Side-Way"
+                )
+                or (
+                    mid_term_score == "Side-Way"
+                    and short_term_score == "Side-Way"
+                )
+            ):
+                pass
+            else:
+                print(f"{symbol} is Trending: {long_term_score}")
+                symbols.append(symbol)
+                lastUpdate.status = f"Added {symbol} to list"
+
     except Exception as e:
         lastUpdate.status = f"{e}"
         pass
@@ -180,43 +237,12 @@ async def scanSideway():
     lastUpdate.status = f"Scanning {len(symbolist)} Symbols"
     ta_data = TATable()
     symbols = []
-    for symbol in symbolist:
-        try:
-            df1, df2, df3 = await asyncio.gather(
-                bot_1(symbol, ta_data.__dict__, "1d"),
-                bot_2(symbol, ta_data.__dict__, "6h"),
-                bot_3(symbol, ta_data.__dict__, "1h"),
-            )
-
-            if df1 is not None:
-                long_term = ta_score(df1)
-                mid_term = ta_score(df2)
-                short_term = ta_score(df3)
-                long_term_score = long_term.benchmarking()
-                mid_term_score = mid_term.benchmarking()
-                short_term_score = short_term.benchmarking()
-                if (
-                    (
-                        long_term_score == "Side-Way"
-                        and mid_term_score == "Side-Way"
-                    )
-                    or (
-                        long_term_score == "Side-Way"
-                        and short_term_score == "Side-Way"
-                    )
-                    or (
-                        mid_term_score == "Side-Way"
-                        and short_term_score == "Side-Way"
-                    )
-                ):
-                    print(f"{symbol} is Side-Way: Pass")
-                    pass
-                else:
-                    symbols.append(symbol)
-                    lastUpdate.status = f"Added {symbol} to list"
-        except Exception as e:
-            lastUpdate.status = f"{e}"
-            pass
+    tasks = [
+        asyncio.create_task(scaning_method(symbol, ta_data, symbols))
+        for symbol in symbolist
+    ]
+    async for task in split_list(tasks, 5):
+        await asyncio.gather(*task)
     return symbols
 
 
@@ -358,6 +384,102 @@ async def dailyreport():
         return
 
 
+def check_moneymanagment(status):
+    config = AppConfig()
+    max_margin = config.max_margin
+    min_balance = config.min_balance
+    margin = float(
+        (
+            status["initialMargin"].astype("float64")
+            * status["leverage"].astype("float64")
+        ).sum()
+    )
+    return {
+        "max_margin": max_margin,
+        "margin": margin,
+        "min_balance": min_balance,
+        "can_trade": False if margin > max_margin else True,
+    }
+
+
+async def main_bot_no_setting(symbol: str) -> None:
+    try:
+        ta_table_data = TATable()
+
+        balance = account_balance.balance
+        risk_manage_data = DefaultRiskTable(symbol)
+        lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
+
+        if risk_manage_data.usehedge:
+            data, df_hedge = await asyncio.gather(
+                bot_1(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.timeframe,
+                ),
+                bot_2(
+                    risk_manage_data.symbol,
+                    ta_table_data.__dict__,
+                    risk_manage_data.hedge_timeframe,
+                ),
+            )
+        else:
+            data = await bot_1(
+                risk_manage_data.symbol,
+                ta_table_data.__dict__,
+                risk_manage_data.timeframe,
+            )
+            df_hedge = None
+
+        if data is None:
+            return
+
+        positions = balance["info"]["positions"]
+        status = pd.DataFrame(
+            [
+                position
+                for position in positions
+                if float(position["positionAmt"]) != 0
+            ],
+            columns=statcln,
+        )
+
+        mm_permission = check_moneymanagment(status)
+
+        if df_hedge is not None:
+            await asyncio.gather(
+                feed(
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    status,
+                    mm_permission,
+                ),
+                feed_hedge(
+                    df_hedge,
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    status,
+                    mm_permission,
+                ),
+            )
+        else:
+            await asyncio.gather(
+                feed(
+                    data,
+                    risk_manage_data.__dict__,
+                    balance,
+                    status,
+                    mm_permission,
+                )
+            )
+
+    except Exception as e:
+        lastUpdate.status = f"{e}"
+        print(f"{risk_manage_data.symbol} got error :{e}")
+
+
 async def main_bot(symbolist: pd.Series) -> None:
     try:
         ta_table_data = TATable(
@@ -396,6 +518,9 @@ async def main_bot(symbolist: pd.Series) -> None:
             )
             df_hedge = None
 
+        if data is None:
+            return
+
         positions = balance["info"]["positions"]
         status = pd.DataFrame(
             [
@@ -406,19 +531,7 @@ async def main_bot(symbolist: pd.Series) -> None:
             columns=statcln,
         )
 
-        margin = 0.0
-        config = AppConfig()
-        max_margin = config.max_margin
-        min_balance = config.min_balance
-        margin = float((status["initialMargin"]).astype("float64").sum())
-
-        if margin > max_margin:
-            notify_send(
-                f"Margin ที่ใช้สูงเกินไปแล้ว\nMargin : {margin}\n",
-                f"ที่กำหนดไว้ : {max_margin}",
-                sticker=17857,
-                package=1070,
-            )
+        mm_permission = check_moneymanagment(status)
 
         if df_hedge is not None:
             await asyncio.gather(
@@ -426,16 +539,16 @@ async def main_bot(symbolist: pd.Series) -> None:
                     data,
                     risk_manage_data.__dict__,
                     balance,
-                    min_balance,
                     status,
+                    mm_permission,
                 ),
                 feed_hedge(
                     df_hedge,
                     data,
                     risk_manage_data.__dict__,
                     balance,
-                    min_balance,
                     status,
+                    mm_permission,
                 ),
             )
         else:
@@ -444,8 +557,8 @@ async def main_bot(symbolist: pd.Series) -> None:
                     data,
                     risk_manage_data.__dict__,
                     balance,
-                    min_balance,
                     status,
+                    mm_permission,
                 )
             )
 
@@ -580,11 +693,18 @@ async def warper_fn():
                 for i in symbolist.index
             ]
 
+            all_symbols = await getAllsymbol()
+            configed_symbol = symbolist["symbol"].tolist()
+            tasks2 = [
+                asyncio.create_task(main_bot_no_setting(symbol))
+                for symbol in all_symbols
+                if symbol not in configed_symbol
+            ]
+
             sub_tasks = []
 
             if time.time() >= timer.next_candle:
                 lastUpdate.candle = time.ctime(time.time())
-                await binance_i.get_exchange()
                 await account_balance.update_balance()
                 await update_candle()
                 async for task in split_list(tasks, 5):
@@ -605,7 +725,10 @@ async def warper_fn():
                     sub_tasks.append(asyncio.create_task(waiting()))
                 if len(sub_tasks) > 0:
                     await asyncio.gather(*sub_tasks)
+                async for task in split_list(tasks2, 5):
+                    await asyncio.gather(*task)
                 timer.next_candle += timer.min_timewait
+                await binance_i.disconnect()
             else:
                 await binance_i.disconnect()
                 await asyncio.sleep(timer.next_candle - time.time())

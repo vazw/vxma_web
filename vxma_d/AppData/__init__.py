@@ -10,3 +10,4 @@ lastUpdate = Last_update()
 currentMode = PositionMode()
 candle_ohlc = {}
 timer = Timer()
+notify_history = {}

@@ -169,6 +169,31 @@ class RiskManageTable:
         return True if str(arg).lower() == "true" else False
 
 
+class DefaultRiskTable:
+    def __init__(self, symbol: str):
+        self.symbol = symbol
+        self.quote = "BUSD" if self.symbol.endswith("BUSD") else "USDT"
+        # if self.symbol[0:4] == "1000":
+        #     self.symbol = self.symbol[4 : len(self.symbol)]
+        self.timeframe = "6h"
+        self.use_long = True
+        self.use_short = True
+        self.use_tp_1 = True
+        self.use_tp_2 = False
+        self.use_sl = True
+        self.use_tailing = True
+        self.free_balance = 100.0
+        self.max_size = 20
+        self.risk_size = "%5"
+        self.tp_percent = "50"
+        self.tp_percent_2 = "50"
+        self.risk_reward_1 = 2
+        self.risk_reward_2 = 3
+        self.leverage = 10
+        self.usehedge = False
+        self.hedge_timeframe = "15m"
+
+
 @dataclass
 class Last_update:
     candle: str = "T -- ----------"

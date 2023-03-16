@@ -1,14 +1,6 @@
-# VXMA Trading
+# Bottrade
 web app bot-trading version beta
-
-## Installtion
-for Docker
-```sh
-$ git clone https://github.com/vazw/vxma_web.git
-$ cd vxma_web
-$ docker build -t vxma_web .
-$ docker run -p 8050:8050 vxma_web
-```
+docker deployments
 
 ### default 
 User = 'vxma'
@@ -39,7 +31,6 @@ password = 'vxmaBot'
 
 ## Changelog
 > let's begin our journey to financial freedom!
-
 ```
 ├─ 0.1.0 start! 
 ├─ 0.1.1  
@@ -62,12 +53,15 @@ password = 'vxmaBot'
 │   ├── Update Balance faster
 │   ├── Fixed bug 
 │   ├── Add OrderClientId for future-use 
-├─ 0.1.5  
-│   ├── Add async tasks for each bot settings
-│   ├── 200% faster
-│   ├── Update Trading Record Mechanic
-│   ├── Logging Balance for portfolio tracker
-│   ├── Update to singleton pattern to minimize resoucese
+├─ 0.1.5
+│   ├── Update CCXT to singleton instance
+│   ├── Fixed min amount for notional 5.0 to 6.0 ($)
+│   ├── removed daily scan sideway report
+├─ 0.1.6  
+│   ├── Added DefaultRiskTable for Non Setting symbols
+│   ├── scan all symbols on the markets
+│   ├── added MM permision to avoid max_margins
+│   ├── changed way to calculate all-margin (margin * leverage)
 ```
 
 [![Tradingview_VXMA](https://user-images.githubusercontent.com/8637706/196947394-d71c8ef6-9ab7-451a-b6bc-55a642c9e845.png)](https://www.tradingview.com/script/m54nptt2-VXMA-Bot)

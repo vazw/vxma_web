@@ -8,6 +8,7 @@ from vxma_d.AppData import (
     lastUpdate,
     candle_ohlc,
     timer,
+    notify_history,
 )
 from vxma_d.AppData.Appdata import (
     AppConfig,
@@ -127,10 +128,10 @@ binance_i = Binance()
 
 async def get_bidask(symbol, exchange, bidask="ask"):
     try:
-        info = (await exchange.fetch_bids_asks())[symbol][bidask]
+        info = await exchange.fetch_bids_asks([symbol])
+        return float(next(y[bidask] for x, y in info.items()))
     except Exception:
-        info = (await exchange.fetch_bids_asks())[symbol[:-5]][bidask]
-    return float(info)
+        return await get_bidask(symbol, exchange, bidask)
 
 
 async def get_symbol():
@@ -180,7 +181,7 @@ async def fetching_candle_ohlc(symbol, timeframe, limits):
         )
         return bars
     except Exception as e:
-        print(f"failed to fetching_candle_ohlc :{lastUpdate.status} {e}")
+        print(f"failed to fetching_candle_ohlc : {e}")
         return await fetching_candle_ohlc(symbol, timeframe, limits)
 
 
@@ -188,7 +189,10 @@ async def fetchbars(symbol, timeframe) -> None:
     """
     get candle from exchange and update them to ram
     """
-    if f"{symbol}_{timeframe}" not in candle_ohlc.keys():
+    if (
+        f"{symbol}_{timeframe}" not in candle_ohlc.keys()
+        or candle_ohlc[f"{symbol}_{timeframe}"]["candle"] is None
+    ):
         bars = await fetching_candle_ohlc(symbol, timeframe, barsC)
         df = pd.DataFrame(
             bars[:-1],
@@ -202,7 +206,14 @@ async def fetchbars(symbol, timeframe) -> None:
             df["timestamp"], unit="ms", utc=True
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
         df = df.set_index("timestamp")
-        candle_ohlc.update({f"{symbol}_{timeframe}": df})
+        candle_ohlc.update(
+            {
+                f"{symbol}_{timeframe}": {
+                    "candle": df,
+                    "cTime": df.index[len(df.index) - 1],
+                }
+            }
+        )
     else:
         bars = await fetching_candle_ohlc(symbol, timeframe, 5)
         df = pd.DataFrame(
@@ -218,11 +229,14 @@ async def fetchbars(symbol, timeframe) -> None:
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
         df = df.set_index("timestamp")
         df = pd.concat(
-            [candle_ohlc[f"{symbol}_{timeframe}"], df], ignore_index=False
+            [candle_ohlc[f"{symbol}_{timeframe}"]["candle"], df],
+            ignore_index=False,
         )
-        candle_ohlc[f"{symbol}_{timeframe}"] = df[
-            ~df.index.duplicated(keep="last")
-        ].tail(barsC)
+        df = df[~df.index.duplicated(keep="last")].tail(barsC)
+        candle_ohlc[f"{symbol}_{timeframe}"]["candle"] = df
+        candle_ohlc[f"{symbol}_{timeframe}"]["cTime"] = df.index[
+            len(df.index) - 1
+        ]
 
 
 # set leverage pass
@@ -503,10 +517,11 @@ def buysize(df, balance, symbol, exchange, RISK, min_amount):
         risk = float(RISK)
     amount = abs(risk / (df["close"][last] - low))
     if amount < min_amount:
-        amount = min_amount
         notify_send(
-            f"ใช้ Size ขั้นต่ำสำหรับ {symbol}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"
+            f"ใช้ Size ขั้นต่ำสำหรับ {symbol}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง\n"
+            + f"Size เดิม : {amount}\nSize ใหม่ : {min_amount}"
         )
+        amount = min_amount
     lot = exchange.amount_to_precision(symbol, amount)
     return float(lot)
 
@@ -525,10 +540,11 @@ def sellsize(df, balance, symbol, exchange, RISK, min_amount):
         risk = float(RISK)
     amount = abs(risk / (high - df["close"][last]))
     if amount < min_amount:
-        amount = min_amount
         notify_send(
-            f"ใช้ Size ขั้นต่ำสำหรับ {symbol}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"
+            f"ใช้ Size ขั้นต่ำสำหรับ {symbol}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง\n"
+            + f"Size เดิม : {amount}\nSize ใหม่ : {min_amount}"
         )
+        amount = min_amount
     lot = exchange.amount_to_precision(symbol, amount)
     return float(lot)
 
@@ -552,7 +568,7 @@ async def OpenLong(
         )
         ask = await get_bidask(risk_manage["symbol"], exchange, "ask")
         if min_amount * ask < 5.0:
-            min_amount = 5.05 / ask
+            min_amount = 6.0 / ask
         amount = buysize(
             df,
             balance,
@@ -567,10 +583,12 @@ async def OpenLong(
         if amount * ask > risk_manage["max_size"] * int(leve):
             new_lots = risk_manage["max_size"] * int(leve) / ask
             if new_lots < min_amount:
-                new_lots = min_amount
                 notify_send(
-                    f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
+                    f"Risk Size ใหญ่เกินไป ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}"  # noqa:
+                    + "\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"
+                    + f"Size เดิม : {new_lots}Size ใหม่ : {min_amount}"
                 )
+                new_lots = min_amount
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
@@ -647,6 +665,7 @@ async def OpenLong(
                 + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
             )
             notify_send(msg)
+            return
         time_now = lastUpdate.candle
         write_trade_record(
             time_now,
@@ -738,7 +757,7 @@ async def OpenShort(
         )
         bid = await get_bidask(risk_manage["symbol"], exchange, "bid")
         if min_amount * bid < 5.0:
-            min_amount = 5.05 / bid
+            min_amount = 6.0 / bid
         amount = sellsize(
             df,
             balance,
@@ -753,10 +772,12 @@ async def OpenShort(
         if amount * bid > risk_manage["max_size"] * int(leve):
             new_lots = risk_manage["max_size"] * int(leve) / bid
             if new_lots < min_amount:
-                new_lots = min_amount
                 notify_send(
-                    f"ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"  # noqa:
+                    f"Risk Size ใหญ่เกินไป ใช้ Size ขั้นต่ำสำหรับ {risk_manage['symbol']}"  # noqa:
+                    + "\nโปรดตรวจสอบ SL ด้วยตนเองอีกครั้ง"
+                    + f"Size เดิม : {new_lots}Size ใหม่ : {min_amount}"
                 )
+                new_lots = min_amount
             amount = float(
                 exchange.amount_to_precision(risk_manage["symbol"], new_lots)
             )
@@ -833,6 +854,7 @@ async def OpenShort(
                 + " USD\nบอทจะทำการยกเลิกการเข้า Position ทั้งหมด"
             )
             notify_send(msg)
+            return
         time_now = lastUpdate.candle
         write_trade_record(
             time_now,
@@ -1155,12 +1177,39 @@ async def check_if_closed_position(
         return
 
 
+def notify_signal(df, risk_manage, mm_permission, is_hedge: bool = False):
+    timeframe = (
+        risk_manage["hedge_timeframe"]
+        if is_hedge
+        else risk_manage["timeframe"]
+    )
+    if f"{risk_manage['symbol']}_{timeframe}" not in notify_history.keys():
+        notify_history[f"{risk_manage['symbol']}_{timeframe}"] = 0
+    if (
+        candle_ohlc[f"{risk_manage['symbol']}_{timeframe}"]["cTime"]
+        != notify_history[f"{risk_manage['symbol']}_{timeframe}"]
+    ):
+        notify_send(
+            f"{risk_manage['symbol']} {timeframe}"
+            + "\nเกิดสัญญาณซื้อ-ขาย แต่ "
+            + "Risk Margin รวมสูงเกินไปแล้ว!!"
+            + f"\nRisk ทั้งหมด : {round(mm_permission['margin'],3)} $\n"
+            + f"Risk สูงสุดที่กำหนดไว้ : {round(mm_permission['max_margin'],3)} $",  # noqa:
+            sticker=17857,
+            package=1070,
+        )
+        candle(df, risk_manage["symbol"], timeframe)
+        notify_history[f"{risk_manage['symbol']}_{timeframe}"] = candle_ohlc[
+            f"{risk_manage['symbol']}_{timeframe}"
+        ]["cTime"]
+
+
 async def feed(
     df,
     risk_manage,
     balance,
-    min_balance,
     status,
+    mm_permission,
 ):
 
     last = len(df.index) - 1
@@ -1199,29 +1248,35 @@ async def feed(
             )
             await account_balance.update_balance()
             if risk_manage["use_long"]:
-                await OpenLong(
-                    df,
-                    balance,
-                    risk_manage,
-                    currentMode.Lside,
-                    min_balance,
-                    risk_manage["timeframe"],
-                )
-                await account_balance.update_balance()
+                if mm_permission["can_trade"]:
+                    await OpenLong(
+                        df,
+                        balance,
+                        risk_manage,
+                        currentMode.Lside,
+                        mm_permission["min_balance"],
+                        risk_manage["timeframe"],
+                    )
+                    await account_balance.update_balance()
+                else:
+                    notify_signal(df, risk_manage, mm_permission)
             else:
                 print("No permission for excute order : Do nothing")
 
         else:
             if risk_manage["use_long"]:
-                await OpenLong(
-                    df,
-                    balance,
-                    risk_manage,
-                    currentMode.Lside,
-                    min_balance,
-                    risk_manage["timeframe"],
-                )
-                await account_balance.update_balance()
+                if mm_permission["can_trade"]:
+                    await OpenLong(
+                        df,
+                        balance,
+                        risk_manage,
+                        currentMode.Lside,
+                        mm_permission["min_balance"],
+                        risk_manage["timeframe"],
+                    )
+                    await account_balance.update_balance()
+                else:
+                    notify_signal(df, risk_manage, mm_permission)
             else:
                 print("No permission for excute order : Do nothing")
 
@@ -1241,28 +1296,34 @@ async def feed(
             )
             await account_balance.update_balance()
             if risk_manage["use_short"]:
-                await OpenShort(
-                    df,
-                    balance,
-                    risk_manage,
-                    currentMode.Sside,
-                    min_balance,
-                    risk_manage["timeframe"],
-                )
-                await account_balance.update_balance()
+                if mm_permission["can_trade"]:
+                    await OpenShort(
+                        df,
+                        balance,
+                        risk_manage,
+                        currentMode.Sside,
+                        mm_permission["min_balance"],
+                        risk_manage["timeframe"],
+                    )
+                    await account_balance.update_balance()
+                else:
+                    notify_signal(df, risk_manage, mm_permission)
             else:
                 print("No permission for excute order : Do nothing")
         else:
             if risk_manage["use_short"]:
-                await OpenShort(
-                    df,
-                    balance,
-                    risk_manage,
-                    currentMode.Sside,
-                    min_balance,
-                    risk_manage["timeframe"],
-                )
-                await account_balance.update_balance()
+                if mm_permission["can_trade"]:
+                    await OpenShort(
+                        df,
+                        balance,
+                        risk_manage,
+                        currentMode.Sside,
+                        mm_permission["min_balance"],
+                        risk_manage["timeframe"],
+                    )
+                    await account_balance.update_balance()
+                else:
+                    notify_signal(df, risk_manage, mm_permission)
             else:
                 print("No permission for excute order : Do nothing")
 
@@ -1272,8 +1333,8 @@ async def feed_hedge(
     df_trend,
     risk_manage,
     balance,
-    min_balance,
     status: pd.DataFrame,
+    mm_permission,
 ):
 
     last = len(df.index) - 1
@@ -1308,16 +1369,19 @@ async def feed_hedge(
     ):
         print("hedging changed to Bullish, buy")
         if risk_manage["use_long"]:
-            await OpenLong(
-                df,
-                balance,
-                risk_manage,
-                currentMode.Lside,
-                min_balance,
-                risk_manage["hedge_timeframe"],
-                False,
-            )
-            await account_balance.update_balance()
+            if mm_permission["can_trade"]:
+                await OpenLong(
+                    df,
+                    balance,
+                    risk_manage,
+                    currentMode.Lside,
+                    mm_permission["min_balance"],
+                    risk_manage["hedge_timeframe"],
+                    False,
+                )
+                await account_balance.update_balance()
+            else:
+                notify_signal(df, risk_manage, mm_permission, True)
         else:
             print("No permission for excute order : Do nothing")
 
@@ -1351,16 +1415,19 @@ async def feed_hedge(
     ):
         print("hedging changed to Bearish, Sell")
         if risk_manage["use_short"]:
-            await OpenShort(
-                df,
-                balance,
-                risk_manage,
-                currentMode.Sside,
-                min_balance,
-                risk_manage["hedge_timeframe"],
-                False,
-            )
-            await account_balance.update_balance()
+            if mm_permission["can_trade"]:
+                await OpenShort(
+                    df,
+                    balance,
+                    risk_manage,
+                    currentMode.Sside,
+                    mm_permission["min_balance"],
+                    risk_manage["hedge_timeframe"],
+                    False,
+                )
+                await account_balance.update_balance()
+            else:
+                notify_signal(df, risk_manage, mm_permission, True)
         else:
             print("No permission for excute order : Do nothing")
 
