@@ -124,14 +124,34 @@ common_names = {
 }
 
 
+async def split_list(input_list, chunk_size):
+    # Create a deque object from the input list
+    deque_obj = deque(input_list)
+    # While the deque object is not empty
+    while deque_obj:
+        # Pop chunk_size elements from the left side of the deque object
+        # and append them to the chunk list
+        chunk = []
+        for _ in range(chunk_size):
+            if deque_obj:
+                chunk.append(deque_obj.popleft())
+
+        # Yield the chunk
+        yield chunk
+
+
 async def update_candle() -> None:
     try:
+        timenow = time.time()
         update_tasks = [
             asyncio.create_task(fetchbars(symbol, tf))
             for symbol, tf in [str(i).split("_") for i in candle_ohlc.keys()]
+            if timenow
+            > candle_ohlc[f"{symbol}_{tf}"]["cTime"] + TIMEFRAME_SECONDS[tf]
         ]
         if len(update_tasks) > 0:
-            await asyncio.gather(*update_tasks)
+            async for task in split_list(update_tasks, 5):
+                await asyncio.gather(*task)
     except Exception as e:
         lastUpdate.status = f"{e}"
         print(f"update candle error : {e}")
@@ -322,13 +342,13 @@ async def hourly_report():
     fiat_balance = account_balance.fiat_balance
     lastUpdate.balance = fiat_balance
     msg = (
-        "Balance Report\n BUSD"
-        + f"\nFree   : {round(fiat_balance['BUSD']['free'],2)}$"
-        + f"\nMargin : {round(fiat_balance['BUSD']['used'],2)}$"
-        + f"\nTotal  : {round(fiat_balance['BUSD']['total'],2)}$\nUSDT"
+        "Balance Report\n USDT"
         + f"\nFree   : {round(fiat_balance['USDT']['free'],2)}$"
         + f"\nMargin : {round(fiat_balance['USDT']['used'],2)}$"
-        + f"\nTotal  : {round(fiat_balance['USDT']['total'],2)}$"
+        + f"\nTotal  : {round(fiat_balance['USDT']['total'],2)}$\nBUSD"
+        + f"\nFree   : {round(fiat_balance['BUSD']['free'],2)}$"
+        + f"\nMargin : {round(fiat_balance['BUSD']['used'],2)}$"
+        + f"\nTotal  : {round(fiat_balance['BUSD']['total'],2)}$"
         + f"\nNet Profit/Loss  : {round(netunpl,2)}$"
     )
     notify_send(msg)
@@ -384,21 +404,26 @@ async def dailyreport():
         return
 
 
-def check_moneymanagment(status):
+def check_moneymanagment(status, quote):
     config = AppConfig()
     max_margin = config.max_margin
     min_balance = config.min_balance
-    margin = float(
+    fiat_balance = account_balance.fiat_balance
+    free = fiat_balance[quote]["free"]
+    risk = float(
         (
             status["initialMargin"].astype("float64")
             * status["leverage"].astype("float64")
         ).sum()
     )
+    margin = float((status["initialMargin"].astype("float64")).sum())
     return {
-        "max_margin": max_margin,
         "margin": margin,
+        "max_margin": max_margin,
+        "risk": risk,
+        "free": free,
         "min_balance": min_balance,
-        "can_trade": False if margin > max_margin else True,
+        "can_trade": False if margin > max_margin or risk > free else True,
     }
 
 
@@ -444,7 +469,7 @@ async def main_bot_no_setting(symbol: str) -> None:
             columns=statcln,
         )
 
-        mm_permission = check_moneymanagment(status)
+        mm_permission = check_moneymanagment(status, risk_manage_data.quote)
 
         if df_hedge is not None:
             await asyncio.gather(
@@ -531,7 +556,7 @@ async def main_bot(symbolist: pd.Series) -> None:
             columns=statcln,
         )
 
-        mm_permission = check_moneymanagment(status)
+        mm_permission = check_moneymanagment(status, risk_manage_data.quote)
 
         if df_hedge is not None:
             await asyncio.gather(
@@ -635,22 +660,6 @@ async def get_waiting_time():
     except Exception as e:
         print(f"fail to set min time :{e}")
         return await get_waiting_time()
-
-
-async def split_list(input_list, chunk_size):
-    # Create a deque object from the input list
-    deque_obj = deque(input_list)
-    # While the deque object is not empty
-    while deque_obj:
-        # Pop chunk_size elements from the left side of the deque object
-        # and append them to the chunk list
-        chunk = []
-        for _ in range(chunk_size):
-            if deque_obj:
-                chunk.append(deque_obj.popleft())
-
-        # Yield the chunk
-        yield chunk
 
 
 async def warper_fn():

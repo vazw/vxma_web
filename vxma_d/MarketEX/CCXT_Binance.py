@@ -202,6 +202,7 @@ async def fetchbars(symbol, timeframe) -> None:
             timer.last_closed = int(df["timestamp"][len(df.index) - 1] / 1000)
             timer.get_time = False
 
+        closed_time = int(df["timestamp"][len(df.index) - 1] / 1000)
         df["timestamp"] = pd.to_datetime(
             df["timestamp"], unit="ms", utc=True
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
@@ -210,7 +211,7 @@ async def fetchbars(symbol, timeframe) -> None:
             {
                 f"{symbol}_{timeframe}": {
                     "candle": df,
-                    "cTime": df.index[len(df.index) - 1],
+                    "cTime": closed_time,
                 }
             }
         )
@@ -224,6 +225,7 @@ async def fetchbars(symbol, timeframe) -> None:
             timer.last_closed = int(df["timestamp"][len(df.index) - 1] / 1000)
             timer.get_time = False
 
+        closed_time = int(df["timestamp"][len(df.index) - 1] / 1000)
         df["timestamp"] = pd.to_datetime(
             df["timestamp"], unit="ms", utc=True
         ).map(lambda x: x.tz_convert("Asia/Bangkok"))
@@ -234,9 +236,7 @@ async def fetchbars(symbol, timeframe) -> None:
         )
         df = df[~df.index.duplicated(keep="last")].tail(barsC)
         candle_ohlc[f"{symbol}_{timeframe}"]["candle"] = df
-        candle_ohlc[f"{symbol}_{timeframe}"]["cTime"] = df.index[
-            len(df.index) - 1
-        ]
+        candle_ohlc[f"{symbol}_{timeframe}"]["cTime"] = closed_time
 
 
 # set leverage pass
@@ -1189,11 +1189,14 @@ def notify_signal(df, risk_manage, mm_permission, is_hedge: bool = False):
         candle_ohlc[f"{risk_manage['symbol']}_{timeframe}"]["cTime"]
         != notify_history[f"{risk_manage['symbol']}_{timeframe}"]
     ):
+        quote = risk_manage["quote"]
         notify_send(
             f"{risk_manage['symbol']} {timeframe}"
-            + "\nเกิดสัญญาณซื้อ-ขาย แต่ "
+            + "\nเกิดสัญญาณซื้อ-ขาย\nแต่ "
             + "Risk Margin รวมสูงเกินไปแล้ว!!"
-            + f"\nRisk ทั้งหมด : {round(mm_permission['margin'],3)} $\n"
+            + f"\nFree Balance : {round(mm_permission['free'],3)} {quote}"
+            + f"\nMargin รวม  : {round(mm_permission['margin'],3)} $"
+            + f"\nRisk ทั้งหมด : {round(mm_permission['risk'],3)} $\n"
             + f"Risk สูงสุดที่กำหนดไว้ : {round(mm_permission['max_margin'],3)} $",  # noqa:
             sticker=17857,
             package=1070,
