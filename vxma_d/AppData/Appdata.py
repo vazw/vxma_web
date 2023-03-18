@@ -126,16 +126,15 @@ def perf(id, pwd):
 
 
 def max_margin_size(size, free_balance) -> float:
-    Max_Size = size
-    if Max_Size[0] == "$":
-        Max_Size = float(Max_Size[1 : len(Max_Size)])
+    if size[0] == "$":
+        Max_Size = float(size[1 : len(size)])
         return Max_Size
-    elif Max_Size[0] == "%":
-        size = float(Max_Size[1 : len(Max_Size)])
+    elif size[0] == "%":
+        size = float(size[1 : len(size)])
         Max_Size = free_balance * (size / 100)
         return Max_Size
     else:
-        Max_Size = float(Max_Size)
+        Max_Size = float(size)
         return Max_Size
 
 
@@ -185,8 +184,8 @@ class DefaultRiskTable:
         self.free_balance = 100.0
         self.max_size = 20
         self.risk_size = "%5"
-        self.tp_percent = "50"
-        self.tp_percent_2 = "50"
+        self.tp_percent = 50
+        self.tp_percent_2 = 50
         self.risk_reward_1 = 2
         self.risk_reward_2 = 3
         self.leverage = 10
