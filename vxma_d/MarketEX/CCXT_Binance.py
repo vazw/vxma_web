@@ -511,7 +511,7 @@ def buysize(df, balance, symbol, exchange, RISK, min_amount):
     if RISK[0] == "$":
         risk = float(RISK[1 : len(RISK)])
     elif RISK[0] == "%":
-        percent = float(RISK)
+        percent = float(RISK[1 : len(RISK)])
         risk = (percent / 100) * freeusd
     else:
         risk = float(RISK)
@@ -534,7 +534,7 @@ def sellsize(df, balance, symbol, exchange, RISK, min_amount):
     if RISK[0] == "$":
         risk = float(RISK[1 : len(RISK)])
     elif RISK[0] == "%":
-        percent = float(RISK)
+        percent = float(RISK[1 : len(RISK)])
         risk = (percent / 100) * freeusd
     else:
         risk = float(RISK)
