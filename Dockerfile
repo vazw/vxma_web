@@ -10,8 +10,8 @@ RUN python3 -m pip install -r requirements.txt --no-clean --disable-pip-version-
 
 FROM python
 
-COPY . .
-COPY --from=builder . .
+COPY . ./
+COPY --from=builder . ./
 
 ENV PATH="/env/bin:$PATH"
 ENV TZ="Asia/Bangkok"
