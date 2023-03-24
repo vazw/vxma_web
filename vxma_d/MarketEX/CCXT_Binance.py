@@ -129,7 +129,9 @@ binance_i = Binance()
 async def get_bidask(symbol, exchange, bidask="ask"):
     try:
         info = await exchange.fetch_bids_asks([symbol])
-        return float(next(y[bidask] for x, y in info.items()))
+        return float(
+            next(y[bidask] for x, y in info.items())  # pyright: ignore
+        )
     except Exception:
         return await get_bidask(symbol, exchange, bidask)
 
@@ -180,6 +182,9 @@ async def fetching_candle_ohlc(symbol, timeframe, limits):
             symbol, timeframe=timeframe, since=None, limit=limits
         )
         return bars
+    except ccxt.errors.BadSymbol as e:
+        print(f"No symbols skip : {e}")
+        return None
     except Exception as e:
         print(f"failed to fetching_candle_ohlc : {e}")
         return await fetching_candle_ohlc(symbol, timeframe, limits)
@@ -194,6 +199,8 @@ async def fetchbars(symbol, timeframe) -> None:
         or candle_ohlc[f"{symbol}_{timeframe}"]["candle"] is None
     ):
         bars = await fetching_candle_ohlc(symbol, timeframe, barsC)
+        if bars is None:
+            return
         df = pd.DataFrame(
             bars[:-1],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
@@ -221,6 +228,8 @@ async def fetchbars(symbol, timeframe) -> None:
             bars[:-1],
             columns=["timestamp", "open", "high", "low", "close", "volume"],
         )
+        if bars is None:
+            return
         if timer.get_time and timeframe == timer.min_timeframe:
             timer.last_closed = int(df["timestamp"][len(df.index) - 1] / 1000)
             timer.get_time = False
@@ -250,7 +259,7 @@ async def setleverage(symbol, lev, exchange):
         lev = max(
             [
                 y["leverage"]
-                for x, y in enumerate(lever)
+                for x, y in enumerate(lever)  # pyright: ignore
                 if y["info"]["symbol"] == symbol or y["symbol"] == symbol
             ]
         )
@@ -1095,6 +1104,15 @@ async def check_current_position(symbol: str, status: pd.DataFrame) -> dict:
     }
 
 
+async def get_closed_pnl(symbol):
+    try:
+        exchange = await binance_i.get_exchange()
+        closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
+        return closed_pnl[0]
+    except Exception:
+        return None
+
+
 async def check_if_closed_position(
     df: pd.DataFrame,
     symbol: str,
@@ -1112,7 +1130,11 @@ async def check_if_closed_position(
     posim = symbol[:-5].replace("/", "")
     last = len(df.index) - 1
     if df["isSL"][last] == 1 and saved_position is not None:
-        notify_send(f"{symbol} got Stop-Loss!")
+        closed_pnl = await get_closed_pnl(symbol)
+        notify_send(
+            f"{symbol} {timeframe} {direction} got Stop-Loss!\n"
+            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['realizedPnl']}"
+        )
         time_now = lastUpdate.candle
         edit_trade_record(
             time_now,
@@ -1133,11 +1155,10 @@ async def check_if_closed_position(
         and status["positionSide"][i] == direction.upper()
     ]
     if posim not in ex_position and saved_position is not None:
-        exchange = await binance_i.get_exchange()
-        closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
+        closed_pnl = await get_closed_pnl(symbol)
         notify_send(
-            f"{symbol} {timeframe} {direction} Being Closed! "
-            + f"at {closed_pnl[0]['price']}"
+            f"{symbol} {timeframe} {direction} Being Closed!\n"
+            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['realizedPnl']}"
         )
         edit_trade_record(
             lastUpdate.candle,
@@ -1158,11 +1179,10 @@ async def check_if_closed_position(
     )
     saved_amount = float(saved_position["Amount"])
     if saved_amount != abs(ex_amount):
-        exchange = await binance_i.get_exchange()
-        closed_pnl = await exchange.fetch_my_trades(symbol, limit=1)
+        closed_pnl = await get_closed_pnl(symbol)
         notify_send(
-            f"{symbol} {timeframe} {direction} Being TP!! "
-            + f"at {closed_pnl[0]['price']}"
+            f"{symbol} {timeframe} {direction} Being TP!!\n"
+            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['realizedPnl']}"
         )
         write_tp_record(
             lastUpdate.candle,
@@ -1177,12 +1197,8 @@ async def check_if_closed_position(
         return
 
 
-def notify_signal(df, risk_manage, mm_permission, is_hedge: bool = False):
-    timeframe = (
-        risk_manage["hedge_timeframe"]
-        if is_hedge
-        else risk_manage["timeframe"]
-    )
+def notify_signal(df, risk_manage, mm_permission, signal: str = ""):
+    timeframe = risk_manage["timeframe"]
     if f"{risk_manage['symbol']}_{timeframe}" not in notify_history.keys():
         notify_history[f"{risk_manage['symbol']}_{timeframe}"] = 0
     if (
@@ -1192,7 +1208,7 @@ def notify_signal(df, risk_manage, mm_permission, is_hedge: bool = False):
         quote = risk_manage["quote"]
         notify_send(
             f"{risk_manage['symbol']} {timeframe}"
-            + "\nเกิดสัญญาณซื้อ-ขาย\nแต่ "
+            + f"\nเกิดสัญญาณ {signal}\nแต่ "
             + "Risk Margin รวมสูงเกินไปแล้ว!!"
             + f"\nFree Balance : {round(mm_permission['free'],3)} {quote}"
             + f"\nMargin รวม  : {round(mm_permission['margin'],3)} $"
@@ -1217,7 +1233,7 @@ async def feed(
 
     last = len(df.index) - 1
 
-    current_position, closed = await asyncio.gather(
+    current_position, closed = await asyncio.gather(  # pyright: ignore
         check_current_position(risk_manage["symbol"], status.copy()),
         check_if_closed_position(
             df,
@@ -1262,7 +1278,7 @@ async def feed(
                     )
                     await account_balance.update_balance()
                 else:
-                    notify_signal(df, risk_manage, mm_permission)
+                    notify_signal(df, risk_manage, mm_permission, "Long")
             else:
                 print("No permission for excute order : Do nothing")
 
@@ -1279,7 +1295,7 @@ async def feed(
                     )
                     await account_balance.update_balance()
                 else:
-                    notify_signal(df, risk_manage, mm_permission)
+                    notify_signal(df, risk_manage, mm_permission, "Long")
             else:
                 print("No permission for excute order : Do nothing")
 
@@ -1310,7 +1326,7 @@ async def feed(
                     )
                     await account_balance.update_balance()
                 else:
-                    notify_signal(df, risk_manage, mm_permission)
+                    notify_signal(df, risk_manage, mm_permission, "Short")
             else:
                 print("No permission for excute order : Do nothing")
         else:
@@ -1326,7 +1342,7 @@ async def feed(
                     )
                     await account_balance.update_balance()
                 else:
-                    notify_signal(df, risk_manage, mm_permission)
+                    notify_signal(df, risk_manage, mm_permission, "Short")
             else:
                 print("No permission for excute order : Do nothing")
 
@@ -1342,7 +1358,7 @@ async def feed_hedge(
 
     last = len(df.index) - 1
 
-    current_position, closed = await asyncio.gather(
+    current_position, closed = await asyncio.gather(  # pyright: ignore
         check_current_position(risk_manage["symbol"], status.copy()),
         check_if_closed_position(
             df,
@@ -1372,19 +1388,16 @@ async def feed_hedge(
     ):
         print("hedging changed to Bullish, buy")
         if risk_manage["use_long"]:
-            if mm_permission["can_trade"]:
-                await OpenLong(
-                    df,
-                    balance,
-                    risk_manage,
-                    currentMode.Lside,
-                    mm_permission["min_balance"],
-                    risk_manage["hedge_timeframe"],
-                    False,
-                )
-                await account_balance.update_balance()
-            else:
-                notify_signal(df, risk_manage, mm_permission, True)
+            await OpenLong(
+                df,
+                balance,
+                risk_manage,
+                currentMode.Lside,
+                mm_permission["min_balance"],
+                risk_manage["hedge_timeframe"],
+                False,
+            )
+            await account_balance.update_balance()
         else:
             print("No permission for excute order : Do nothing")
 
@@ -1418,19 +1431,16 @@ async def feed_hedge(
     ):
         print("hedging changed to Bearish, Sell")
         if risk_manage["use_short"]:
-            if mm_permission["can_trade"]:
-                await OpenShort(
-                    df,
-                    balance,
-                    risk_manage,
-                    currentMode.Sside,
-                    mm_permission["min_balance"],
-                    risk_manage["hedge_timeframe"],
-                    False,
-                )
-                await account_balance.update_balance()
-            else:
-                notify_signal(df, risk_manage, mm_permission, True)
+            await OpenShort(
+                df,
+                balance,
+                risk_manage,
+                currentMode.Sside,
+                mm_permission["min_balance"],
+                risk_manage["hedge_timeframe"],
+                False,
+            )
+            await account_balance.update_balance()
         else:
             print("No permission for excute order : Do nothing")
 

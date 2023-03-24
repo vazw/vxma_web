@@ -169,7 +169,7 @@ class RiskManageTable:
 
 
 class DefaultRiskTable:
-    def __init__(self, symbol: str):
+    def __init__(self, symbol: str, balance):
         self.symbol = symbol
         self.quote = "BUSD" if self.symbol.endswith("BUSD") else "USDT"
         # if self.symbol[0:4] == "1000":
@@ -181,7 +181,7 @@ class DefaultRiskTable:
         self.use_tp_2 = False
         self.use_sl = True
         self.use_tailing = True
-        self.free_balance = 100.0
+        self.free_balance = float(balance["free"][self.quote])
         self.max_size = 20
         self.risk_size = "%5"
         self.tp_percent = 50

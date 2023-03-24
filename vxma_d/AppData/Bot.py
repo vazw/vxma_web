@@ -150,7 +150,7 @@ async def update_candle() -> None:
             > candle_ohlc[f"{symbol}_{tf}"]["cTime"] + TIMEFRAME_SECONDS[tf]
         ]
         if len(update_tasks) > 0:
-            async for task in split_list(update_tasks, 5):
+            async for task in split_list(update_tasks, 10):
                 await asyncio.gather(*task)
     except Exception as e:
         lastUpdate.status = f"{e}"
@@ -261,7 +261,7 @@ async def scanSideway():
         asyncio.create_task(scaning_method(symbol, ta_data, symbols))
         for symbol in symbolist
     ]
-    async for task in split_list(tasks, 5):
+    async for task in split_list(tasks, 10):
         await asyncio.gather(*task)
     return symbols
 
@@ -423,7 +423,9 @@ def check_moneymanagment(status, quote):
         "risk": risk,
         "free": free,
         "min_balance": min_balance,
-        "can_trade": False if margin > max_margin or risk > free else True,
+        "can_trade": False
+        if margin > max_margin or free < min_balance or risk > free
+        else True,
     }
 
 
@@ -432,7 +434,7 @@ async def main_bot_no_setting(symbol: str) -> None:
         ta_table_data = TATable()
 
         balance = account_balance.balance
-        risk_manage_data = DefaultRiskTable(symbol)
+        risk_manage_data = DefaultRiskTable(symbol, balance)
         lastUpdate.status = f"Scaning {risk_manage_data.symbol}"
 
         if risk_manage_data.usehedge:
@@ -648,6 +650,7 @@ async def get_waiting_time():
         timer.min_timewait = min(tf_secconds)
         if timer.min_timewait >= 3600:
             timer.min_timewait = 1800
+            all_timeframes.append("30m")
         timer.min_timeframe = next(
             i
             for i in all_timeframes
@@ -716,7 +719,7 @@ async def warper_fn():
                 lastUpdate.candle = time.ctime(time.time())
                 await account_balance.update_balance()
                 await update_candle()
-                async for task in split_list(tasks, 5):
+                async for task in split_list(tasks, 10):
                     await asyncio.gather(*task)
                 await asyncio.sleep(0.5)
                 if str(local_time[11:-9]) == "07:0" and not insession["day"]:
@@ -734,7 +737,7 @@ async def warper_fn():
                     sub_tasks.append(asyncio.create_task(waiting()))
                 if len(sub_tasks) > 0:
                     await asyncio.gather(*sub_tasks)
-                async for task in split_list(tasks2, 5):
+                async for task in split_list(tasks2, 10):
                     await asyncio.gather(*task)
                 timer.next_candle += timer.min_timewait
                 await binance_i.disconnect()
