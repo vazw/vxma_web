@@ -1133,7 +1133,7 @@ async def check_if_closed_position(
         closed_pnl = await get_closed_pnl(symbol)
         notify_send(
             f"{symbol} {timeframe} {direction} got Stop-Loss!\n"
-            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['realizedPnl']}"
+            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['info']['realizedPnl']}"
         )
         time_now = lastUpdate.candle
         edit_trade_record(
@@ -1158,14 +1158,14 @@ async def check_if_closed_position(
         closed_pnl = await get_closed_pnl(symbol)
         notify_send(
             f"{symbol} {timeframe} {direction} Being Closed!\n"
-            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['realizedPnl']}"
+            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['info']['realizedPnl']}"
         )
         edit_trade_record(
             lastUpdate.candle,
             symbol,
             timeframe,
             direction,
-            closed_pnl[0]["price"],
+            closed_pnl["price"],
         )
         del status
         return
@@ -1182,14 +1182,14 @@ async def check_if_closed_position(
         closed_pnl = await get_closed_pnl(symbol)
         notify_send(
             f"{symbol} {timeframe} {direction} Being TP!!\n"
-            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['realizedPnl']}"
+            + f"at {closed_pnl['price']}\nP/L : {closed_pnl['info']['realizedPnl']}"
         )
         write_tp_record(
             lastUpdate.candle,
             symbol,
             timeframe,
             direction,
-            closed_pnl[0]["price"],
+            closed_pnl["price"],
             saved_amount - abs(ex_amount),
             saved_position,
         )
