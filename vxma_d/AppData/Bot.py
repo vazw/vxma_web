@@ -424,7 +424,7 @@ def check_moneymanagment(status, quote):
         "free": free,
         "min_balance": min_balance,
         "can_trade": False
-        if margin > max_margin or free < min_balance or risk > free
+        if margin > max_margin or free < min_balance or risk > (free * 10)
         else True,
     }
 
