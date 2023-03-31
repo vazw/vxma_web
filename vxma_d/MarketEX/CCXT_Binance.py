@@ -1091,6 +1091,7 @@ async def check_current_position(symbol: str, status: pd.DataFrame) -> dict:
     is_in_Short = True if amt_short != 0 else False
     del status
     return {
+        "symbol": posim,
         "long": {
             "amount": amt_long,
             "pnl": upnl_long,
@@ -1152,7 +1153,14 @@ async def check_if_closed_position(
         f"{status['symbol'][i]}"
         for i in status.index
         if status["symbol"][i] == posim
-        and status["positionSide"][i] == direction.upper()
+        and (
+            status["positionSide"][i] == direction.upper()
+            or (
+                (status["positionAmt"][i] > 0)
+                if direction.upper() == "LONG"
+                else (status["positionAmt"][i] < 0)
+            )
+        )
     ]
     if posim not in ex_position and saved_position is not None:
         closed_pnl = await get_closed_pnl(symbol)
@@ -1169,12 +1177,20 @@ async def check_if_closed_position(
         )
         del status
         return
+
     ex_amount = float(
         (
             status["positionAmt"][i]
             for i in status.index
             if status["symbol"][i] == posim
-            and status["positionSide"][i] == direction.upper()
+            and (
+                status["positionSide"][i] == direction.upper()
+                or (
+                    (status["positionAmt"][i] > 0)
+                    if direction.upper() == "LONG"
+                    else (status["positionAmt"][i] < 0)
+                )
+            )
         ).__next__()
     )
     saved_amount = float(saved_position["Amount"])
